@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['pending', 'approved', 'denied'])->default('pending');
+            $table->datetime('approval_date');
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->string('duration');
             $table->integer('participants');
             $table->date('booking_date');
-            $table->string('booking_attachments')->nullable();
-            $table->string('equipment')->nullable();
+            $table->json('booking_attachments')->nullable();
+            $table->json('equipment')->nullable();
             $table->string('policy')->nullable();
             $table->enum('status', ['pending', 'confirmed', 'canceled'])->default('pending'); // Add status for approval process
             $table->timestamps();

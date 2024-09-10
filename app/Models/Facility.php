@@ -21,6 +21,11 @@ class Facility extends Model
         'status',
     ];
 
+    protected $casts = [
+        'capacity' => 'integer',
+        'floor_level' => 'integer',
+    ];
+
     public function reservation()
     {
         return $this->hasMany(Reservation::class);

@@ -25,7 +25,12 @@ class Booking extends Model
     ];
     
     protected $casts = [
+        'booking_date' => 'date',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
         'equipment' => 'array',
+        'participants' => 'integer',
+        'booking_attachments' => 'array',
     ];
 
     public function facility()

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('facility_type');
             $table->integer('capacity');
             $table->string('building_name');
-            $table->string('floor_level');
+            $table->integer('floor_level');
             $table->string('room_number');
             $table->text('description');
             $table->string('facility_image')->nullable();
