@@ -246,6 +246,7 @@ class BookingModal extends Component implements HasForms
             ->title('Booking created successfully!')
             ->icon('heroicon-o-document-text')
             ->iconColor('success')
+            ->body('Please wait for Signatory approval. You can Track your booking anytime.')
             ->send();
     }
 }

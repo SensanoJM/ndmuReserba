@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\Booking;
 use App\Models\Facility;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     * php artisan migrate:refresh --seed
      */
     public function run(): void
     {
@@ -21,6 +22,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
+            'role' => 'admin',
         ]);
 
         User::factory()->create([
@@ -28,6 +30,15 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
+            'role' => 'user',
+        ]);
+
+        User::factory()->create([
+            'name' => 'Test Signatory',
+            'email' => 'signatory@example.com',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'role' => 'signatory',
         ]);
 
         // Seed Facilities
@@ -92,5 +103,20 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Additional facility seeds can be added here...
+        // Create a new booking
+        Booking::create([
+            'purpose' => 'Test booking',
+            'duration' => '2 hours',
+            'participants' => 10,
+            'booking_date' => '2024-08-20',
+            'booking_attachments' => null,
+            'equipment' => null,
+            'policy' => null,
+            'status' => 'pending',
+            'start_time' => '09:00:00',
+            'end_time' => '11:00:00',
+            'user_id' => 1, // Assuming you have a user with id 1
+            'facility_id' => 1, // Assuming you have a facility with id 1
+        ]);
     }
 }

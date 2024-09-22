@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
-            //$table->string('requester'); // This might be redundant if user_id is used
             $table->string('purpose');
             $table->string('duration');
             $table->integer('participants');
@@ -21,10 +20,10 @@ return new class extends Migration
             $table->json('booking_attachments')->nullable();
             $table->json('equipment')->nullable();
             $table->string('policy')->nullable();
-            $table->enum('status', ['pending', 'confirmed', 'canceled'])->default('pending'); // Add status for approval process
-            $table->timestamps();
+            $table->enum('status', ['pending', 'in_review', 'approved', 'denied'])->default('pending'); // pending, in_review, approved, denied
             $table->time('start_time');
             $table->time('end_time');
+            $table->timestamps();
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

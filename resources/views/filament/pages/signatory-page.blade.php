@@ -1,3 +1,3 @@
 <x-filament-panels::page>
-    <livewire:reservation-table />
+    <livewire:signatory-table />
 </x-filament-panels::page>

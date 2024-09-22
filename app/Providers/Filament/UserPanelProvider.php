@@ -18,6 +18,7 @@ class UserPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
+        //http://127.0.0.1:8000/user/login
         return $panel
             ->id('user')
             ->path('user')

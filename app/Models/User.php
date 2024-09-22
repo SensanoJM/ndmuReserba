@@ -17,9 +17,27 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array<int, string>
      */
     protected $fillable = [
-        'name', 'email', 'password', 'email_verified_at',
+        'name',
+        'email',
+        'password',
+        'email_verified_at',
+        'role',
     ];
 
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isSignatory()
+    {
+        return $this->role === 'signatory';
+    }
+
+    public function isUser()
+    {
+        return $this->role === 'user';
+    }
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -45,5 +63,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function booking()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function reservationsAsSignatory()
+    {
+        return $this->belongsToMany(Reservation::class, 'reservation_signatory')
+            ->withPivot('status', 'notes')
+            ->withTimestamps();
     }
 }

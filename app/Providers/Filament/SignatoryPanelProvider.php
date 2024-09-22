@@ -17,38 +17,28 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Filament\Pages\SignatoryPage;
 
-class AdminPanelProvider extends PanelProvider
+class SignatoryPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
-            ->id('admin')
-            ->darkMode(false)
-            ->path('admin')
-            ->login(\App\Filament\Auth\AdminLogin::class)
-            ->registration()
-            ->passwordReset()
-            ->emailVerification()
-            ->passwordReset()
-            ->profile()
+            ->id('signatory')
+            ->path('signatory')
+            ->login(\App\Filament\Auth\SignatoryLogin::class)
             ->colors([
-                'primary' => Color::Emerald,
-                'danger' => Color::Rose,
-                'gray' => Color::Gray,
-                'info' => Color::Indigo,
-                'success' => Color::Emerald,
-                'warning' => Color::Orange,
+                'primary' => Color::Blue,
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            // ->discoverResources(in: app_path('Filament/Signatory/Resources'), for: 'App\\Filament\\Signatory\\Resources')
+            ->discoverPages(in: app_path('Filament/Signatory/Pages'), for: 'App\\Filament\\Signatory\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                SignatoryPage::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->discoverWidgets(in: app_path('Filament/Signatory/Widgets'), for: 'App\\Filament\\Signatory\\Widgets')
             ->widgets([
-                //
+                Widgets\AccountWidget::class,
+                Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

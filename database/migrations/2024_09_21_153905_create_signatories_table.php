@@ -11,12 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('reservations', function (Blueprint $table) {
+        Schema::create('signatories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('booking_id')->constrained()->onDelete('cascade');
+            $table->foreignId('reservation_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['pending', 'approved', 'denied'])->default('pending');
-            $table->timestamp('admin_approval_date')->nullable();
-            $table->timestamp('final_approval_date')->nullable();
+            $table->integer('order');
+            $table->timestamp('approval_date')->nullable();
             $table->timestamps();
         });
     }
@@ -26,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('reservations');
+        Schema::dropIfExists('signatories');
     }
 };

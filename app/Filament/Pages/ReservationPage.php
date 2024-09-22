@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Filament\Pages;
+use App\Livewire\ReservationTable;
 
 use Filament\Pages\Page;
 
@@ -13,4 +14,5 @@ class ReservationPage extends Page
     protected static ?string $slug = 'Reservation';
 
     protected static string $view = 'filament.pages.reservation-page';
+
 }
