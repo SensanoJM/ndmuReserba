@@ -18,6 +18,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Pages\SignatoryPage;
+use Filament\Notifications\Livewire\DatabaseNotifications;
 
 class SignatoryPanelProvider extends PanelProvider
 {
@@ -53,6 +54,7 @@ class SignatoryPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            ->topbar(DatabaseNotifications::class);
     }
 }

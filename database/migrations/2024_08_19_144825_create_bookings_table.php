@@ -24,6 +24,10 @@ return new class extends Migration
             $table->time('start_time');
             $table->time('end_time');
             $table->timestamps();
+
+            // Signatories 
+            $table->string('adviser_email'); // Adviser/Faculty/Coach
+            $table->string('dean_email'); // Dean/Head Unit
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

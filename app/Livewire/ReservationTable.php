@@ -2,23 +2,29 @@
 
 namespace App\Livewire;
 
+use App\Jobs\SendSignatoryEmailsJob;
 use App\Models\Booking;
 use App\Models\Reservation;
-use App\Models\User;
 use App\Models\Signatory;
+use App\Models\User;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Builder;
-use Livewire\Component;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
+use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Livewire\Component;
 
 class ReservationTable extends Component implements HasForms, HasTable
 {
@@ -26,6 +32,14 @@ class ReservationTable extends Component implements HasForms, HasTable
     use InteractsWithForms;
 
     public $recordId;
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query($this->getTableQuery())
+            ->columns($this->getTableColumns())
+            ->actions($this->getTableActions());
+    }
 
     protected function getTableQuery(): Builder
     {
@@ -55,21 +69,23 @@ class ReservationTable extends Component implements HasForms, HasTable
             BadgeColumn::make('status')
                 ->colors([
                     'info' => 'pending',
+                    'warning' => 'in_review',
                     'success' => 'confirmed',
                     'danger' => 'canceled',
                 ])
                 ->formatStateUsing(fn($state) => match ($state) {
                     'pending' => 'Pending',
+                    'in_review' => 'In Review',
                     'confirmed' => 'Approved', // Display "Approved" instead of "Confirmed"
                     'canceled' => 'Denied', // Display "Denied" instead of "Canceled"
                 }),
         ];
     }
-    
+
     public function bookingInfolist(Booking $booking): Infolist
     {
         return Infolist::make()
-            ->record($booking)  // Pass the booking record here
+            ->record($booking) // Pass the booking record here
             ->schema([
                 Section::make('Booking Details')
                     ->schema([
@@ -94,6 +110,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                             ->badge()
                             ->color(fn(string $state): string => match ($state) {
                                 'pending' => 'info',
+                                'in_review' => 'warning',
                                 'confirmed' => 'success',
                                 'canceled' => 'danger',
                             }),
@@ -106,13 +123,12 @@ class ReservationTable extends Component implements HasForms, HasTable
     {
         return [
             Action::make('view')
-            ->icon('heroicon-o-eye')
-            ->modalContent(function (Booking $record) {
-                // Use the bookingInfolist method to avoid code repetition
-                return $this->bookingInfolist($record)->render();  // Call the existing bookingInfolist method
-            })
-            ->modalSubmitAction(false)
-            ->modalCancelAction(false),
+                ->icon('heroicon-o-eye')
+                ->modalContent(function (Booking $record) {
+                    return $this->bookingInfolist($record)->render();
+                })
+                ->modalSubmitAction(false)
+                ->modalCancelAction(false),
             Action::make('approve')
                 ->icon('heroicon-o-check')
                 ->color('success')
@@ -126,15 +142,65 @@ class ReservationTable extends Component implements HasForms, HasTable
         ];
     }
 
+    /**
+     * Approve a booking request.
+     *
+     * If the booking is pending, and no reservation has been created yet,
+     * update the booking status to "in_review", create a new reservation,
+     * and send a "Booking Approved" notification.
+     *
+     * If the booking has already been approved, or a reservation already exists,
+     * send a "Booking Already Approved" notification.
+     *
+     * Added a check to prevent creating duplicate reservations.
+     *
+     * @param Booking $booking The booking to approve
+     * @return void
+     */
     public function approveBooking(Booking $booking)
     {
-        $booking->update(['status' => 'in_review']);
-        $this->createReservation($booking);
+        // Check if a reservation already exists for this booking
+        $existingReservation = Reservation::where('booking_id', $booking->id)->first();
+
+        if (!$existingReservation) {
+            DB::transaction(function () use ($booking) {
+                $booking->update(['status' => 'in_review']);
+                $this->createReservation($booking);
+            });
+
+            Notification::make()
+                ->title('Booking Approved')
+                ->success()
+                ->send();
+
+            // Refresh the table data
+            $this->dispatch('refreshTable');
+        } else {
+            Notification::make()
+                ->title('Booking Already Approved')
+                ->warning()
+                ->send();
+        }
     }
 
+    #[On('refreshTable')]
+    public function refreshTable()
+    {
+        // This method will be called when the 'refreshTable' event is dispatched
+        // The table will automatically refresh due to Livewire's reactivity
+    }
+
+    // Deny a booking request.
     public function denyBooking(Booking $booking)
     {
         $booking->update(['status' => 'denied']);
+
+        Notification::make()
+            ->title('Booking Denied')
+            ->danger()
+            ->send();
+
+        $this->render();
     }
 
     //The createReservation method creates a new Reservation record and calls createSignatories.
@@ -147,41 +213,57 @@ class ReservationTable extends Component implements HasForms, HasTable
         ]);
 
         $this->createSignatories($reservation);
+
+        return $reservation;
     }
 
-    // The createSignatories method creates Signatory records for each required approver, 
-    // setting the order field. It then calls notifyNextSignatory.
+    /**
+     * Create Signatory records for a Reservation and dispatch the job to send emails.
+     *
+     * @param  \App\Models\Reservation  $reservation
+     * @return void
+     */
     private function createSignatories(Reservation $reservation)
     {
-        $signatoryRoles = ['adviser', 'dean', 'president'];
+        $booking = $reservation->booking;
+        $signatoryRoles = [
+            'adviser' => $booking->adviser_email,
+            'dean' => $booking->dean_email,
+            'school_president' => $this->getSchoolPresidentEmail(),
+        ];
 
-        foreach ($signatoryRoles as $role) {
-            Signatory::create([
-                'reservation_id' => $reservation->id,
-                'role' => $role,
-                'status' => 'pending',
-                'approval_token' => Str::random(64),
-            ]);
+        foreach ($signatoryRoles as $role => $email) {
+            // Validate email
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new InvalidArgumentException("Invalid email for role {$role}: {$email}");
+            }
+
+            // Check if there's a corresponding user account
+            $userId = User::where('email', $email)->value('id');
+
+            Signatory::updateOrCreate(
+                [
+                    'reservation_id' => $reservation->id,
+                    'role' => $role,
+                ],
+                [
+                    'email' => $email,
+                    'user_id' => $userId, // This can be null if no matching user is found
+                    'status' => 'pending',
+                    'approval_token' => Str::random(64),
+                ]
+            );
         }
 
-        $this->notifySignatories($reservation);
+        // Dispatch the job to send emails
+        SendSignatoryEmailsJob::dispatch($reservation);
     }
 
-    // The notifySignatories method sends email notifications to all signatories simultaneously.
-    private function notifySignatories(Reservation $reservation)
+    private function getSchoolPresidentEmail()
     {
-        foreach ($reservation->signatories as $signatory) {
-            // Here you would implement the logic to send an email notification
-            // For example:
-            // Mail::to($this->getSignatoryEmail($signatory->role))->send(new SignatoryApprovalRequest($reservation, $signatory));
-        }
-    }
-
-    // To check if all signatories have approved. If so, it notifies the Director.
-    private function getSignatoryEmail($role)
-    {
-        // Implement logic to get the email of the signatory based on their role
-        // This could be a lookup in your User table or a predefined mapping
+        return User::where('role', 'signatory')
+            ->where('position', 'school_president')
+            ->value('email');
     }
 
     // Check if all signatories have approved the reservation.
@@ -192,20 +274,8 @@ class ReservationTable extends Component implements HasForms, HasTable
         });
 
         if ($allApproved) {
-            $this->notifyDirector($reservation);
-        }
-    }
-
-    // Notify the Director of Students and Affairs Organization when all signatories have approved the reservation.
-    private function notifyDirector(Reservation $reservation)
-    {
-        $director = User::where('role', 'signatory')
-            ->where('position', 'Director of Students and Affairs Organization')
-            ->first();
-
-        if ($director) {
-            // Notify the director
-            // Mail::to($director->email)->send(new DirectorApprovalRequest($reservation));
+            $reservation->update(['status' => 'pending']);
+            // The Director notification is now handled by the ReservationObserver
         }
     }
 
@@ -220,6 +290,7 @@ class ReservationTable extends Component implements HasForms, HasTable
         $reservation->booking->update(['status' => 'approved']);
 
         // Notify the user that their booking has been fully approved
+        // You might want to add a notification or email to the user here
     }
 
     public function render()

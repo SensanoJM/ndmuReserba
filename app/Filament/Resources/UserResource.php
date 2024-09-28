@@ -39,7 +39,7 @@ class UserResource extends Resource
                     ->unique('users', 'email')
                     ->maxLength(255),
 
-                Forms\Components\Select::make('role')
+                    Forms\Components\Select::make('role')
                     ->label('Role')
                     ->options([
                         'user' => 'User',
@@ -48,6 +48,15 @@ class UserResource extends Resource
                     ])
                     ->required()
                     ->default('user'),
+                
+                Forms\Components\Select::make('position')
+                    ->label('Position')
+                    ->options([
+                        'school_president' => 'School President',
+                        'school_director' => 'School Director',
+                    ])
+                    ->visible(fn (\Closure $get) => $get('role') === 'signatory')
+                    ->required(fn (\Closure $get) => $get('role') === 'signatory'),
 
                 Forms\Components\TextInput::make('password')
                     ->label('Password')

@@ -41,6 +41,8 @@ class BookingModal extends Component implements HasForms
     public $selectedFacility = null;
     public $availabilityMessage = '';
     public $isAvailable = true;
+    public $adviser_email;
+    public $dean_email;
 
     public function render()
     {
@@ -61,7 +63,7 @@ class BookingModal extends Component implements HasForms
         $this->reset([
             'facility_id', 'booking_date', 'start_time', 'end_time', 'purpose',
             'duration', 'participants', 'policy', 'equipments', 'booking_attachments',
-            'availabilityMessage', 'isAvailable',
+            'availabilityMessage', 'isAvailable', 'adviser_email', 'dean_email',
         ]);
     }
 
@@ -150,6 +152,20 @@ class BookingModal extends Component implements HasForms
                             ->multiple() // Add this if you want to allow multiple file uploads
                             ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']), // Specify accepted file types
                     ]),
+                // Signatory Step
+                Step::make('Signatory Details')
+                    ->schema([
+                        TextInput::make('adviser_email')
+                        ->label('Adviser/Faculty/Coach Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
+                        TextInput::make('dean_email')
+                        ->label('Dead/Head Unit Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
+                    ]),
             ])
                 ->submitAction(Action::make('submit')
                         ->label('Submit')
@@ -226,6 +242,8 @@ class BookingModal extends Component implements HasForms
             'policy' => $this->policy,
             'user_id' => Auth::id(),
             'equipment' => $equipments,
+            'adviser_email' => $this->adviser_email,
+            'dean_email' => $this->dean_email,
         ]);
 
         // Handle file uploads

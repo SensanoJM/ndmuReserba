@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'role' => 'admin',
+            'position' => null,
         ]);
 
         User::factory()->create([
@@ -31,6 +32,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'role' => 'user',
+            'position' => null,
         ]);
 
         User::factory()->create([
@@ -39,6 +41,16 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'role' => 'signatory',
+            'position' => 'school_director',
+        ]);
+
+        User::factory()->create([
+            'name' => 'Test President',
+            'email' => 'president@example.com',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'role' => 'signatory',
+            'position' => 'school_president',
         ]);
 
         // Seed Facilities
@@ -117,6 +129,8 @@ class DatabaseSeeder extends Seeder
             'end_time' => '11:00:00',
             'user_id' => 1, // Assuming you have a user with id 1
             'facility_id' => 1, // Assuming you have a facility with id 1
+            'adviser_email' => 'sensanomarlu@gmail.com',
+            'dean_email' => 'sensanomarlu@gmail.com',
         ]);
     }
 }

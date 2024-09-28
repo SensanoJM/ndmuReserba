@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('signatories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('reservation_id')->constrained()->onDelete('cascade');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('role');
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->enum('status', ['pending', 'approved', 'denied'])->default('pending');
-            $table->integer('order');
             $table->timestamp('approval_date')->nullable();
+            $table->string('email')->nullable();
+            $table->string('approval_token')->nullable();
             $table->timestamps();
         });
     }

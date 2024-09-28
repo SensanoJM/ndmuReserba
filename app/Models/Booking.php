@@ -22,6 +22,9 @@ class Booking extends Model
         'policy',
         'equipment',
         'booking_attachments',
+        'adviser_email',
+        'dean_email',
+        'status',
     ];
     
     protected $casts = [

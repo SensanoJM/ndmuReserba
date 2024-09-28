@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'email_verified_at',
         'role',
+        'position',
     ];
 
     public function isAdmin()
@@ -65,10 +66,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Booking::class);
     }
 
-    public function reservationsAsSignatory()
+    // Define relationship with Signatory
+    public function signatories()
     {
-        return $this->belongsToMany(Reservation::class, 'reservation_signatory')
-            ->withPivot('status', 'notes')
-            ->withTimestamps();
+        return $this->hasMany(Signatory::class);
     }
 }
