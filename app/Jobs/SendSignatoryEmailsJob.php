@@ -30,13 +30,25 @@ class SendSignatoryEmailsJob implements ShouldQueue
      */
     public function handle()
     {
-        $signatories = $this->reservation->signatories()->with('user')->get();
+        $signatories = $this->reservation->signatories;
 
         foreach ($signatories as $signatory) {
-            if ($signatory->user) {
-                Mail::to($signatory->user->email)
-                    ->send(new SignatoryApprovalRequest($this->reservation, $signatory));
+            $email = $this->getSignatoryEmail($signatory);
+            
+            if ($email) {
+                Mail::to($email)->send(new SignatoryApprovalRequest($this->reservation, $signatory));
             }
         }
+    }
+
+    private function getSignatoryEmail($signatory)
+    {
+        if ($signatory->email) {
+            return $signatory->email;
+        } elseif ($signatory->user && $signatory->user->email) {
+            return $signatory->user->email;
+        }
+        
+        return null;
     }
 }

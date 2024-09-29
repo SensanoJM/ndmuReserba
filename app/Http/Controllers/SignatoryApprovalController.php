@@ -71,36 +71,38 @@ class SignatoryApprovalController extends Controller
 
 
     /**
-     * Send an approval email to each signatory for a reservation.
+     * Initiates the approval process for a given reservation by sending an email
+     * to each signatory with a link to approve or deny the reservation.
      *
-     * @param int $reservationId The ID of the reservation to send approval emails for.
+     * @param Reservation $reservation
+     * @return string
      */
     public function initiateApprovalProcess(Reservation $reservation)
     {
-        $reservation->load(['booking.user', 'booking.facility', 'signatories.user']);
-
         Log::info('Initiating approval process for reservation:', ['reservation_id' => $reservation->id]);
-
+    
         foreach ($reservation->signatories as $signatory) {
             Log::info('Processing signatory:', ['signatory_id' => $signatory->id]);
-            
-            if (!$signatory->user) {
-                Log::error('User not found for signatory:', ['signatory_id' => $signatory->id]);
+    
+            $email = $signatory->email ?? ($signatory->user->email ?? null);
+    
+            if (!$email) {
+                Log::error('No email found for signatory:', ['signatory_id' => $signatory->id]);
                 continue;
             }
-
+    
             try {
-                Mail::to($signatory->user->email)->send(new SignatoryApprovalRequest($reservation, $signatory));
-                Log::info('Email sent successfully to:', ['email' => $signatory->user->email]);
+                Mail::to($email)->send(new SignatoryApprovalRequest($reservation, $signatory));
+                Log::info('Email sent successfully to:', ['email' => $email]);
             } catch (\Exception $e) {
                 Log::error("Failed to send approval email to signatory:", [
                     'signatory_id' => $signatory->id,
-                    'user_id' => $signatory->user_id,
+                    'email' => $email,
                     'error' => $e->getMessage()
                 ]);
             }
         }
-
+    
         return "Approval process initiated for reservation {$reservation->id}";
     }
 }
