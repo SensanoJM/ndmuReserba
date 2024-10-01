@@ -40,23 +40,45 @@ class SignatoryApprovalController extends Controller
     }
 
     /**
-     * Handle the signatory approval request, mark the signatory as approved and
-     * notify the director if all signatories have approved the reservation.
+     * Approve a reservation request.
      *
-     * @param  \App\Models\Signatory  $signatory
-     * @return \Illuminate\Http\RedirectResponse
+     * @param  \App\Models\Reservation  $reservation
+     * @param  int  $signatoryId
+     * @return string
      */
-    public function approve(Reservation $reservation, $signatoryId)
+    public function approve(Signatory $signatory, $token)
     {
-        $signatory = $reservation->signatories()->findOrFail($signatoryId);
-        $signatory->update(['approved' => true]);
-        
-        // Check if all signatories have approved
-        if ($reservation->signatories()->where('approved', false)->doesntExist()) {
+        if ($signatory->approval_token !== $token) {
+            abort(403, 'Invalid approval token');
+        }
+    
+        $signatory->update(['status' => 'approved', 'approval_date' => now()]);
+    
+        $reservation = $signatory->reservation;
+        if ($reservation->signatories()->where('status', '!=', 'approved')->doesntExist()) {
             $reservation->update(['status' => 'approved']);
         }
+    
+        return redirect()->route('approval.success')->with('message', 'Reservation approved successfully.');
+    }
 
-        return "Reservation approved successfully.";
+    /**
+     * Deny a reservation request.
+     *
+     * @param  \App\Models\Signatory  $signatory
+     * @param  string  $token
+     * @return \Illuminate\Http\Response
+     */
+    public function deny(Signatory $signatory, $token)
+    {
+        if ($signatory->approval_token !== $token) {
+            abort(403, 'Invalid approval token');
+        }
+    
+        $signatory->update(['status' => 'denied', 'approval_date' => now()]);
+        $signatory->reservation->update(['status' => 'denied']);
+    
+        return redirect()->route('approval.success')->with('message', 'Reservation denied successfully.');
     }
 
     /**
@@ -68,7 +90,6 @@ class SignatoryApprovalController extends Controller
     {
         return view('approval.success');
     }
-
 
     /**
      * Initiates the approval process for a given reservation by sending an email

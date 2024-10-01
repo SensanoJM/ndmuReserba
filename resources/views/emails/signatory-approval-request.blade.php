@@ -9,7 +9,7 @@
 <body>
     <h1>Approval Request for Reservation</h1>
     
-    <p>A reservation requires your approval:</p>
+    <p>Please review the reservation details below:</p>
     
     <p>Booking Details:</p>
     <ul>
@@ -21,9 +21,11 @@
         </li>
     </ul>
     
-    <p>Please click the link below to approve or deny this reservation:</p>
-    
-    <a href="{{ $approvalUrl }}">Review Reservation</a>
+    <p>To approve the request, click the approval link below.</p>
+    <a href="{{ $approvalUrl }}" class="btn btn-success">Approve</a>
+    <br>
+    <p>To deny the request, click the deny link below.</p>
+    <a href="{{ $denialUrl }}" class="btn btn-danger">Deny</a>
     
     <p>Thank you for your attention to this matter.</p>
 </body>

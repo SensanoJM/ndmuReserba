@@ -13,4 +13,5 @@ class BookingPage extends Page
 
     protected static string $view = 'filament.pages.booking-page';
 
+
 }

@@ -9,6 +9,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 class SignatoryApprovalRequest extends Mailable
 {
@@ -17,6 +18,7 @@ class SignatoryApprovalRequest extends Mailable
     public $reservation;
     public $signatory;
     public $approvalUrl;
+    public $denialUrl;
 
     /**
      * Create a new message instance.
@@ -25,7 +27,15 @@ class SignatoryApprovalRequest extends Mailable
     {
         $this->reservation = $reservation;
         $this->signatory = $signatory;
+    
+        // Ensure the signatory has an approval token
+        if (!$this->signatory->approval_token) {
+            $this->signatory->approval_token = Str::random(32);
+            $this->signatory->save();
+        }
+    
         $this->approvalUrl = $signatory->approval_url;
+        $this->denialUrl = $signatory->deny_url;
     }
 
     /**
@@ -36,14 +46,11 @@ class SignatoryApprovalRequest extends Mailable
     public function build()
     {
         return $this->view('emails.signatory-approval-request')
-                    ->subject('Approval Request for Reservation');
-
-        // return $this->view('emails.signatory-approval-request', ['reservation' => $this->reservation])
-        // ->with([
-        //     'reservation' => $this->reservation,
-        //     'signatory' => $this->signatory,
-        //     'approvalUrl' => $this->approvalUrl, // Ensure this is passed to the view
-        // ]);
+                    ->subject('Approval Request for Reservation')
+                    ->with([
+                        'approvalUrl' => $this->approvalUrl,
+                        'denialUrl' => $this->denialUrl
+                    ]);
     }
 
     /**

@@ -24,18 +24,27 @@ class Signatory extends Model
         'approval_date' => 'datetime',
     ];
 
-    protected static function boot()
+    private function generateApprovalToken()
     {
-        parent::boot();
-
-        static::creating(function ($signatory) {
-            $signatory->approval_token = Str::random(64);
-        });
+        $this->approval_token = Str::random(32);
+        $this->save();
+        return $this->approval_token;
     }
 
     public function getApprovalUrlAttribute()
     {
-        return route('signatory.approval', ['signatory' => $this->id]);
+        return route('signatory.approval', [
+            'signatory' => $this->id,
+            'token' => $this->approval_token ?? $this->generateApprovalToken()
+        ]);
+    }
+    
+    public function getDenyUrlAttribute()
+    {
+        return route('signatory.denial', [
+            'signatory' => $this->id,
+            'token' => $this->approval_token ?? $this->generateApprovalToken()
+        ]);
     }
 
     public function reservation()

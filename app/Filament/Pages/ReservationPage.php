@@ -15,4 +15,11 @@ class ReservationPage extends Page
 
     protected static string $view = 'filament.pages.reservation-page';
 
+    public function getListeners()
+    {
+        return [
+            'bookingStatusChanged' => '$refresh',
+        ];
+    }
+
 }

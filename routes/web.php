@@ -10,9 +10,11 @@ Route::get('/', function () {
 });
 
 //Routes for Emails, SignatoryApprovalController; to test http://localhost/approval/1 (assuming 1 is a valid reservation ID)
-Route::get('/signatory-approval/{signatory}', [SignatoryApprovalController::class, 'approve'])->name('signatory.approval');
-Route::get('/approval', [SignatoryApprovalController::class, 'initiateApprovalProcess']);
+Route::get('/signatory-approval/{signatory}/{token}', [SignatoryApprovalController::class, 'approve'])->name('signatory.approval');
+Route::get('/signatory-denial/{signatory}/{token}', [SignatoryApprovalController::class, 'deny'])->name('signatory.denial');
+
 Route::get('/approval/success', [SignatoryApprovalController::class, 'showSuccessPage'])->name('approval.success');
+Route::get('/approval', [SignatoryApprovalController::class, 'initiateApprovalProcess']);
 Route::get('/approval/{reservation}', [SignatoryApprovalController::class, 'initiateApprovalProcess']);
 
 //Routes for Testing

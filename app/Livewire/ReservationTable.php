@@ -32,6 +32,8 @@ class ReservationTable extends Component implements HasForms, HasTable
     use InteractsWithForms;
 
     public $recordId;
+    public $activeTab = 'all';
+    protected $listeners = ['tabChanged' => 'updateActiveTab'];
 
     public function table(Table $table): Table
     {
@@ -41,9 +43,42 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->actions($this->getTableActions());
     }
 
+    /**
+     * Gets the query for the table.
+     *
+     * Depending on the active tab, filters the bookings by status.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
     protected function getTableQuery(): Builder
     {
-        return Booking::query()->latest();
+        $query = Booking::query();
+
+        switch ($this->activeTab) {
+            case 'pending':
+                $query->where('status', 'pending');
+                break;
+            case 'in_review':
+                $query->where('status', 'in_review');
+                break;
+            case 'approved':
+                $query->where('status', 'approved');
+                break;
+            case 'denied':
+                $query->where('status', 'denied');
+                break;
+            case 'all':
+            default:
+                // No filtering for 'all' tab
+                break;
+        }
+
+        return $query->latest();
+    }
+
+    public function updateActiveTab($tabId)
+    {
+        $this->activeTab = $tabId;
     }
 
     protected function getTableColumns(): array
@@ -173,8 +208,10 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ->success()
                 ->send();
 
-            // Refresh the table data
-            $this->dispatch('refreshTable');
+            // Dispatch an event to refresh both table and tabs
+            $this->refreshTable();
+            // Dispatch an event to refresh both table and tabs
+            $this->dispatch('bookingStatusChanged');
         } else {
             Notification::make()
                 ->title('Booking Already Approved')
@@ -183,10 +220,9 @@ class ReservationTable extends Component implements HasForms, HasTable
         }
     }
 
-    #[On('refreshTable')]
+    #[On('bookingStatusChanged')]
     public function refreshTable()
     {
-        // This method will be called when the 'refreshTable' event is dispatched
         // The table will automatically refresh due to Livewire's reactivity
     }
 
