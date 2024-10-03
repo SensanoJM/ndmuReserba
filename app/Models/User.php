@@ -30,6 +30,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'admin';
     }
 
+    /**
+     * Checks if the user has a signatory role.
+     *
+     * @return bool
+     */
     public function isSignatory()
     {
         return $this->role === 'signatory';

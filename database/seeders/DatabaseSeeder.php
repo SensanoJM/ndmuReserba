@@ -35,7 +35,7 @@ class DatabaseSeeder extends Seeder
 
         User::factory()->create([
             'name' => 'Test Signatory',
-            'email' => 'signatory@example.com',
+            'email' => 'sensanomarlu@gmail.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'role' => 'signatory',

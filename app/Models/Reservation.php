@@ -22,6 +22,19 @@ class Reservation extends Model
         'final_approval_date' => 'datetime',
     ];
 
+    /**
+     * Check if all non-director signatories have approved the reservation.
+     *
+     * @return bool
+     */
+    public function allNonDirectorSignatoriesApproved()
+    {
+        $nonDirectorSignatories = $this->signatories()->where('role', '!=', 'director');
+        $approvedCount = $nonDirectorSignatories->where('status', 'approved')->count();
+        
+        return $approvedCount === $nonDirectorSignatories->count();
+    }
+
     public function booking()
     {
         return $this->belongsTo(Booking::class);

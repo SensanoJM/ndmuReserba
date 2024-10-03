@@ -4,9 +4,9 @@ namespace App\Observers;
 
 use App\Http\Controllers\SignatoryApprovalController;
 use App\Jobs\SendSignatoryEmailsJob;
+use App\Mail\DirectorApprovalRequest;
 use App\Models\Reservation;
-use App\Models\User;
-use App\Notifications\DirectorApprovalRequest;
+use Illuminate\Support\Facades\Mail;
 
 class ReservationObserver
 {
@@ -16,15 +16,19 @@ class ReservationObserver
     {
         $this->signatory_approval_controller = $signatory_approval_controller;
     }
+
     /**
      * Handle the Reservation "created" event.
      */
     public function created(Reservation $reservation): void
     {
-        // Initiate the approval process
-        $this->signatory_approval_controller->initiateApprovalProcess($reservation);
-        // Dispatch the job to send emails simultaneously
-        SendSignatoryEmailsJob::dispatch($reservation);
+        // Only initiate the approval process if the reservation is in a 'pending' state
+        if ($reservation->status === 'pending') {
+            // Initiate the approval process
+            $this->signatory_approval_controller->initiateApprovalProcess($reservation);
+            // Dispatch the job to send emails simultaneously
+            SendSignatoryEmailsJob::dispatch($reservation);
+        }
     }
 
     /**
@@ -32,13 +36,31 @@ class ReservationObserver
      */
     public function updated(Reservation $reservation): void
     {
-        if ($reservation->isDirty('status') && $reservation->status === 'pending_director') {
-            $director = User::where('role', 'signatory')
-                ->where('position', 'school_director')
-                ->first();
-    
-            if ($director) {
-                $director->notify(new DirectorApprovalRequest($reservation));
+        if ($reservation->isDirty('status')) {
+            if ($reservation->status === 'pending_director') {
+                $this->notifyDirector($reservation);
+            } elseif ($reservation->status === 'approved') {
+                // Handle final approval if needed
+                // For example, you might want to notify the user or update related records
+            } elseif ($reservation->status === 'denied') {
+                // Handle denial if needed
+                // For example, you might want to notify the user or update related records
+            }
+        }
+    }
+
+    /**
+     * Notify the director when all other signatories have approved.
+     */
+    private function notifyDirector(Reservation $reservation): void
+    {
+        $director = $reservation->signatories()->where('role', 'director')->first();
+
+        if ($director) {
+            $email = $director->email ?? ($director->user->email ?? null);
+
+            if ($email) {
+                Mail::to($email)->send(new DirectorApprovalRequest($reservation, $director));
             }
         }
     }

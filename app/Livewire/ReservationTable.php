@@ -266,6 +266,7 @@ class ReservationTable extends Component implements HasForms, HasTable
             'adviser' => $booking->adviser_email,
             'dean' => $booking->dean_email,
             'school_president' => $this->getSchoolPresidentEmail(),
+            'school_director' => $this->getSchoolDirectorEmail(),
         ];
 
         foreach ($signatoryRoles as $role => $email) {
@@ -286,7 +287,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                     'email' => $email,
                     'user_id' => $userId, // This can be null if no matching user is found
                     'status' => 'pending',
-                    'approval_token' => Str::random(64),
+                    'approval_token' => Str::random(32),
                 ]
             );
         }
@@ -302,7 +303,21 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->value('email');
     }
 
-    // Check if all signatories have approved the reservation.
+    private function getSchoolDirectorEmail()
+    {
+        return User::where('role', 'signatory')
+            ->where('position', 'school_director')
+            ->value('email');
+    }
+
+    /**
+     * Checks if all signatories have approved the given reservation.
+     * If yes, then it sets the reservation status to 'pending' and
+     * notifies the School Director.
+     *
+     * @param \App\Models\Reservation $reservation
+     * @return void
+     */
     public function checkSignatoryApprovals(Reservation $reservation)
     {
         $allApproved = $reservation->signatories->every(function ($signatory) {
