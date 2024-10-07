@@ -66,14 +66,14 @@ class DirectorApprovalRequest extends Mailable
     private function getPreviousApprovals()
     {
         return $this->reservation->signatories()
-                    ->where('role', '!=', 'director')
+                    ->where('role', '!=', 'school_director')
                     ->where('status', 'approved')
                     ->get()
                     ->map(function ($signatory) {
                         return [
                             'name' => $signatory->user->name,
                             'role' => $signatory->role,
-                            'approved_at' => $signatory->approved_at
+                            'approval_date' => $signatory->approval_date
                         ];
                     });
     }

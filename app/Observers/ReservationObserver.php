@@ -37,30 +37,12 @@ class ReservationObserver
     public function updated(Reservation $reservation): void
     {
         if ($reservation->isDirty('status')) {
-            if ($reservation->status === 'pending_director') {
-                $this->notifyDirector($reservation);
-            } elseif ($reservation->status === 'approved') {
+            if ($reservation->status === 'approved') {
                 // Handle final approval if needed
                 // For example, you might want to notify the user or update related records
             } elseif ($reservation->status === 'denied') {
                 // Handle denial if needed
                 // For example, you might want to notify the user or update related records
-            }
-        }
-    }
-
-    /**
-     * Notify the director when all other signatories have approved.
-     */
-    private function notifyDirector(Reservation $reservation): void
-    {
-        $director = $reservation->signatories()->where('role', 'director')->first();
-
-        if ($director) {
-            $email = $director->email ?? ($director->user->email ?? null);
-
-            if ($email) {
-                Mail::to($email)->send(new DirectorApprovalRequest($reservation, $director));
             }
         }
     }

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->enum('status', ['pending', 'pending_director', 'approved', 'denied'])->default('pending');
             $table->timestamp('admin_approval_date')->nullable();
             $table->timestamp('final_approval_date')->nullable();
+            $table->timestamp('director_notified_at')->nullable();
             $table->timestamps();
         });
     }

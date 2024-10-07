@@ -34,7 +34,7 @@ class SendSignatoryEmailsJob implements ShouldQueue
         $signatories = $this->reservation->signatories;
 
         foreach ($signatories as $signatory) {
-            if ($signatory->role === 'director') {
+            if ($signatory->role === 'school_director') {
                 continue; // Skip director for now
             }
 
@@ -44,9 +44,6 @@ class SendSignatoryEmailsJob implements ShouldQueue
                 Mail::to($email)->send(new SignatoryApprovalRequest($this->reservation, $signatory));
             }
         }
-
-        // Check if all non-director signatories have approved
-        $this->checkAndSendDirectorApproval();
     }
 
     /**
@@ -70,7 +67,7 @@ class SendSignatoryEmailsJob implements ShouldQueue
     private function checkAndSendDirectorApproval()
     {
         if ($this->reservation->allNonDirectorSignatoriesApproved()) {
-            $director = $this->reservation->signatories()->where('role', 'director')->first();
+            $director = $this->reservation->signatories()->where('role', 'school_director')->first();
             if ($director) {
                 $email = $this->getSignatoryEmail($director);
                 if ($email) {

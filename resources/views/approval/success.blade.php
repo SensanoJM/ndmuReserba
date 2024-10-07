@@ -23,10 +23,6 @@
                         @else
                             <p class="text-center">Your response to the reservation has been successfully recorded.</p>
                         @endif
-
-                        {{-- <div class="mt-4 text-center">
-                            <a href="{{ url('/') }}" class="btn btn-primary">Return to Homepage</a>
-                        </div> --}}
                     </div>
                 </div>
             </div>

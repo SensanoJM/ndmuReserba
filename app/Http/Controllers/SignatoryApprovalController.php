@@ -15,9 +15,9 @@ class SignatoryApprovalController extends Controller
     /**
      * Approve a reservation request.
      *
-     * @param  \App\Models\Reservation  $reservation
-     * @param  int  $signatoryId
-     * @return string
+     * @param  \App\Models\Signatory  $signatory
+     * @param  string  $token
+     * @return \Illuminate\Http\Response
      */
     public function approve(Signatory $signatory, $token)
     {
@@ -28,10 +28,10 @@ class SignatoryApprovalController extends Controller
         $signatory->approve();
     
         $reservation = $signatory->reservation;
-        if ($reservation->allNonDirectorSignatoriesApproved()) {
+        
+        // Check if this approval completes all non-director approvals
+        if ($this->allNonDirectorSignatoriesApproved($reservation)) {
             $this->notifyDirector($reservation);
-        } elseif ($signatory->role === 'director' && $reservation->signatories()->where('status', '!=', 'approved')->doesntExist()) {
-            $reservation->update(['status' => 'approved']);
         }
     
         return redirect()->route('approval.success')->with('message', 'Reservation approved successfully.');
@@ -79,7 +79,7 @@ class SignatoryApprovalController extends Controller
     {
         Log::info('Initiating approval process for reservation:', ['reservation_id' => $reservation->id]);
     
-        foreach ($reservation->signatories()->where('role', '!=', 'director')->get() as $signatory) {
+        foreach ($reservation->signatories()->where('role', '!=', 'school_director')->get() as $signatory) {
             $this->sendApprovalEmail($signatory);
         }
     
@@ -87,19 +87,46 @@ class SignatoryApprovalController extends Controller
     }
 
     /**
-     * Notify the School Director of a reservation that is ready for final approval.
-     *
-     * This method is called when all non-director signatories have approved a reservation.
-     * It sends an email to the School Director signatory, requesting final approval.
+     * Check if all non-director signatories have approved the given reservation.
+     * 
+     * This method checks if all the signatories with roles 'adviser', 'dean', and 'school_president'
+     * have approved the reservation. If all of them have approved, it returns true.
+     * If any of them has not approved, or if the signatory does not exist, it returns false.
+     * 
+     * @param  \App\Models\Reservation  $reservation
+     * @return boolean
+     */
+    private function allNonDirectorSignatoriesApproved(Reservation $reservation)
+    {
+        $nonDirectorRoles = ['adviser', 'dean', 'school_president'];
+        
+        foreach ($nonDirectorRoles as $role) {
+            $signatory = $reservation->signatories()->where('role', $role)->first();
+            if (!$signatory || $signatory->status !== 'approved') {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    /**
+     * Send a director approval request email to the school director if the school director
+     * has not been notified yet.
      *
      * @param  \App\Models\Reservation  $reservation
      * @return void
      */
     private function notifyDirector(Reservation $reservation)
     {
-        $director = $reservation->signatories()->where('role', 'director')->first();
-        if ($director) {
-            $this->sendApprovalEmail($director, true);
+        $director = $reservation->signatories()->where('role', 'school_director')->first();
+        if ($director && $director->status === 'pending' && !$reservation->directorNotified()) {
+            $email = $director->email ?? ($director->user->email ?? null);
+            if ($email) {
+                Mail::to($email)->send(new DirectorApprovalRequest($reservation, $director));
+                $reservation->update(['director_notified_at' => now()]); // Mark as notified
+                Log::info("Director approval request sent for reservation {$reservation->id}");
+            }
         }
     }
 
