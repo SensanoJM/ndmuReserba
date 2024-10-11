@@ -10,9 +10,11 @@
         "laravel/framework": "^11.9",
         "laravel/tinker": "^2.9",
         "laravel/ui": "^4.5",
+        "livewire/livewire": "^3.5",
         "nesbot/carbon": "^3.8",
         "nyholm/psr7": "^1.8",
         "railsware/mailtrap-php": "^2.0",
+        "saade/filament-fullcalendar": "^3.2",
         "symfony/http-client": "^7.1"
     },
     "require-dev": {

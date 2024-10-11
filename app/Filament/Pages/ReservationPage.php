@@ -7,11 +7,11 @@ use Filament\Pages\Page;
 
 class ReservationPage extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
     protected static ?string $navigationLabel = 'Reservation';
-    protected ?string $heading = '';
+    protected ?string $heading = 'Manage Reservations';
     protected static ?string $navigationGroup = 'Admin';
-    protected static ?string $slug = 'Reservation';
+    protected static ?string $slug = 'reservation';
 
     protected static string $view = 'filament.pages.reservation-page';
 

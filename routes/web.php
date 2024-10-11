@@ -1,9 +1,8 @@
 <?php
 
 use App\Http\Controllers\SignatoryApprovalController;
-use App\Mail\SignatoryApprovalRequest;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use App\Livewire\BookingCard;  // Make sure this use statement is present
 
 Route::get('/', function () {
     return view('welcome');

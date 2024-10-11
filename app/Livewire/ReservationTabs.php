@@ -46,7 +46,7 @@ class ReservationTabs extends Component
     public function getTabs(): array
     {
         return [
-            'all' => Tab::make('All Reservations')
+            'all' => Tab::make('All')
                 ->badge($this->getBookingCount()),
             'pending' => Tab::make('Pending')
                 ->badge($this->getBookingCount('pending')),

@@ -21,7 +21,7 @@ class ReportResource extends Resource
     protected static ?string $navigationLabel = 'Report';
     protected static ?string $modelLabel = 'Report';
     protected static ?string $navigationGroup = 'Admin';
-    protected static ?string $slug = 'Reports';
+    protected static ?string $slug = 'reports';
 
     public static function form(Form $form): Form
     {

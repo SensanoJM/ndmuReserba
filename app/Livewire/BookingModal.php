@@ -156,27 +156,27 @@ class BookingModal extends Component implements HasForms
                 Step::make('Signatory Details')
                     ->schema([
                         TextInput::make('adviser_email')
-                        ->label('Adviser/Faculty/Coach Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
+                            ->label('Adviser/Faculty/Coach Email')
+                            ->email()
+                            ->required()
+                            ->maxLength(255),
                         TextInput::make('dean_email')
-                        ->label('Dead/Head Unit Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
+                            ->label('Dead/Head Unit Email')
+                            ->email()
+                            ->required()
+                            ->maxLength(255),
                     ]),
             ])
                 ->submitAction(Action::make('submit')
-                        ->label('Submit')
-                        ->color('success')
+                        ->label('Submit Booking')
+                        ->color('primary')
                         ->action('submit'))
                 ->cancelAction(Action::make('cancel')
                         ->label('Cancel')
                         ->color('danger')
                         ->action('closeModal')),
         ];
-    }
+    }   
 
     public function checkAvailability()
     {
@@ -267,4 +267,17 @@ class BookingModal extends Component implements HasForms
             ->body('Please wait for Signatory approval. You can Track your booking anytime.')
             ->send();
     }
+
+    public function updated($propertyName)
+    {
+        if (in_array($propertyName, ['booking_date', 'start_time', 'end_time'])) {
+            $this->debouncedCheckAvailability();
+        }
+    }
+
+    public function debouncedCheckAvailability()
+    {
+        $this->debounce('checkAvailability', 500); // Wait for 500ms of inactivity before calling checkAvailability
+    }
+
 }

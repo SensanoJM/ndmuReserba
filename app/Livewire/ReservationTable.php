@@ -40,7 +40,7 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->query($this->getTableQuery())
             ->columns($this->getTableColumns())
             ->actions($this->getTableActions())
-            ->poll('15s'); // Poll every 10 seconds for updates
+            ->poll('10s'); // Poll every 10 seconds for updates
     }
 
     /**
@@ -139,33 +139,19 @@ class ReservationTable extends Component implements HasForms, HasTable
                         TextEntry::make('status')
                             ->badge()
                             ->color(fn(string $state): string => match ($state) {
-                                'pending' => 'warning',
-                                'in_review' => 'info',
+                                'pending' => 'info',
+                                'in_review' => 'warning',
                                 'approved' => 'primary',
                                 'denied' => 'danger',
                             }),
-                    ]),
+                    ])
+                    ->columns(3),
                 Section::make('Approval Details')
-                    ->schema([
-                        TextEntry::make('reservation.signatories')
-                            ->label('Approvals')
-                            ->listWithLineBreaks()
-                            ->formatStateUsing(function ($state) {
-                                if (!$state) {
-                                    return 'No approvals yet';
-                                }
-
-                                return $state->map(function ($signatory) {
-                                    $userName = $signatory->user ? $signatory->user->name : 'Unknown User';
-                                    $status = ucfirst($signatory->status);
-                                    $approvalDate = $signatory->approval_date
-                                    ? $signatory->approval_date->format('Y-m-d H:i')
-                                    : 'Not approved yet';
-
-                                    return "{$userName} ({$signatory->role}): {$status} on {$approvalDate}";
-                                })->join("\n");
-                            }),
-                    ]),
+                ->schema([
+                    TextEntry::make('formatted_signatories')
+                        ->label('Approvals')
+                        ->listWithLineBreaks(),
+                ]),
             ]);
     }
 

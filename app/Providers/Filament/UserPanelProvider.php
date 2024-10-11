@@ -14,6 +14,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
+
 class UserPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
@@ -24,7 +25,7 @@ class UserPanelProvider extends PanelProvider
             ->path('user')
             ->darkMode(false)
             ->login(\App\Filament\Auth\UserLogin::class)
-            // ... rest of your configuration
+            ->registration(\App\Filament\Auth\UserRegister::class)
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,

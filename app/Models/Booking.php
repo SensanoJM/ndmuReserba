@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\BookingCacheInvalidation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 
 class Booking extends Model
 {
-    use HasFactory;
-    
+    use HasFactory, BookingCacheInvalidation;
+
     protected $fillable = [
         'user_id',
         'facility_id',
@@ -26,7 +26,7 @@ class Booking extends Model
         'dean_email',
         'status',
     ];
-    
+
     protected $casts = [
         'booking_date' => 'date',
         'start_time' => 'datetime',
@@ -49,5 +49,24 @@ class Booking extends Model
     public function reservation()
     {
         return $this->hasOne(Reservation::class);
+    }
+
+    // In App\Models\Booking.php
+
+    public function getFormattedSignatoriesAttribute()
+    {
+        if (!$this->reservation || !$this->reservation->signatories) {
+            return 'No approvals yet';
+        }
+
+        return $this->reservation->signatories->map(function ($signatory) {
+            $userName = $signatory->user ? $signatory->user->name : 'Unknown User';
+            $status = ucfirst($signatory->status);
+            $approvalDate = $signatory->approval_date
+            ? $signatory->approval_date->format('Y-m-d H:i')
+            : 'Not approved yet';
+
+            return "{$userName} ({$signatory->role}): {$status} on {$approvalDate}";
+        })->join("\n");
     }
 }

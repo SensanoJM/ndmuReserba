@@ -23,6 +23,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at',
         'role',
         'position',
+        'id_number',
+        'department_id',
+        'description',
+        
     ];
 
     public function isAdmin()
@@ -30,20 +34,26 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'admin';
     }
 
-    /**
-     * Checks if the user has a signatory role.
-     *
-     * @return bool
-     */
-    public function isSignatory()
+    public function isFaculty()
     {
-        return $this->role === 'signatory';
+        return $this->role === 'faculty';
     }
 
-    public function isUser()
+    public function isStudent()
     {
-        return $this->role === 'user';
+        return $this->role === 'student';
     }
+
+    public function isSignatory()
+    {
+        return $this->role === 'signatory'; 
+    }
+
+    public function isOrganization()
+    {
+        return $this->role === 'organization';
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -75,5 +85,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function signatories()
     {
         return $this->hasMany(Signatory::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 }

@@ -9,6 +9,7 @@ use App\Models\Reservation;
 use App\Observers\ReservationObserver;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Colors\Color;
+use App\Livewire\CalendarWidget;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -34,6 +35,5 @@ class AppServiceProvider extends ServiceProvider
             'success' => Color::Green,
             'warning' => Color::Amber,
         ]);
-        
     }
 }
