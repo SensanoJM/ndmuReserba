@@ -44,11 +44,6 @@ class BookingModal extends Component implements HasForms
     public $adviser_email;
     public $dean_email;
 
-    public function render()
-    {
-        return view('livewire.booking-modal');
-    }
-
     #[On('openBookingModal')]
     public function openModal($facilityId)
     {
@@ -278,6 +273,11 @@ class BookingModal extends Component implements HasForms
     public function debouncedCheckAvailability()
     {
         $this->debounce('checkAvailability', 500); // Wait for 500ms of inactivity before calling checkAvailability
+    }
+
+    public function render()
+    {
+        return view('livewire.booking-modal');
     }
 
 }

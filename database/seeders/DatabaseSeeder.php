@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -86,7 +87,8 @@ class DatabaseSeeder extends Seeder
         // Invoke other seeders here
         $this->call([
             FacilitySeeder::class, // Seeds facilities
-            BookingSeeder::class, // Seeds bookings
+            BookingSeeder::class, // Seeds Approved Bookings for the current month (Calendar view)
+            PendingBookingSeeder::class, // Seeds Pending Bookings for the near future
         ]);
 
     }

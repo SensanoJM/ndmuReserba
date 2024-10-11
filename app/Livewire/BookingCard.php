@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Facility;
+use Filament\Forms\Components\Split;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Support\Enums\FontWeight;
@@ -41,11 +42,15 @@ class BookingCard extends Component implements HasForms, HasTable
                             ->size('lg')
                             ->searchable()
                             ->extraAttributes(['class' => 'text-lg font-bold']),
-                        TextColumn::make('facility_type')
+                            TextColumn::make('facility_type')
+                            ->weight(FontWeight::SemiBold)
+                            ->prefix('Facility Type: ')
                             ->size('sm')
                             ->icon('heroicon-o-building-office')
                             ->searchable(),
                         TextColumn::make('capacity')
+                            ->weight(FontWeight::SemiBold)
+                            ->prefix('Capacity: ')
                             ->size('sm')
                             ->icon('heroicon-o-user-group'),
                     ])->space(1)->extraAttributes(['class' => 'p-2 bg-white rounded-b-lg']),
@@ -53,9 +58,10 @@ class BookingCard extends Component implements HasForms, HasTable
                         TextColumn::make('description')
                             ->size('sm')
                             ->color('gray')
-                            ->limit(100),
+                            ->wrap(),
+                            // ->limit(100),
                     ])->space(3)->extraAttributes(['class' => 'p-2 bg-white rounded-b-lg']),
-                ])->extraAttributes(['class' => 'bg-white shadow-sm rounded-lg overflow-hidden h-full']),
+                ])->extraAttributes(['class' => 'bg-white rounded-lg overflow-hidden h-full']),
             ])
             ->filters([
                 SelectFilter::make('facility_type')
@@ -65,13 +71,6 @@ class BookingCard extends Component implements HasForms, HasTable
                     ->preload(),
             ])
             ->actions([
-                Action::make('book')
-                    ->label('Book Now')
-                    ->color('primary')
-                    ->icon('heroicon-o-calendar')
-                    ->button()
-                    ->action(fn(Facility $record) => $this->openBookingModal($record->id))
-                    ->extraAttributes(['class' => 'w-full justify-center']),
                 Action::make('view')
                     ->label('View')
                     ->color('primary')
@@ -79,6 +78,13 @@ class BookingCard extends Component implements HasForms, HasTable
                     ->icon('heroicon-o-eye')
                     ->button()
                     ->action(fn(Facility $record) => $this->openFacilityDetails($record->id))
+                    ->extraAttributes(['class' => 'w-full justify-center']),
+                Action::make('book')
+                    ->label('Book Now')
+                    ->color('primary')
+                    ->icon('heroicon-o-calendar')
+                    ->button()
+                    ->action(fn(Facility $record) => $this->openBookingModal($record->id))
                     ->extraAttributes(['class' => 'w-full justify-center']),
             ])
             ->filtersFormColumns(3)
