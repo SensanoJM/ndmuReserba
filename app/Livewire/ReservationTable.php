@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Reservation;
 use App\Models\Signatory;
 use App\Models\User;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Section;
@@ -14,6 +15,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -117,64 +119,149 @@ class ReservationTable extends Component implements HasForms, HasTable
         return Infolist::make()
             ->record($booking)
             ->schema([
-                Section::make('Booking Details')
+                Section::make('General Information')
                     ->schema([
                         TextEntry::make('user.name')
-                            ->label('User'),
+                            ->label('Booked by')
+                            ->icon('heroicon-o-user'),
                         TextEntry::make('facility.facility_name')
-                            ->label('Facility'),
-                        TextEntry::make('booking_date')
-                            ->date(),
-                        TextEntry::make('start_time')
-                            ->time(),
-                        TextEntry::make('end_time')
-                            ->time(),
-                        TextEntry::make('purpose'),
-                        TextEntry::make('duration'),
-                        TextEntry::make('participants'),
-                        TextEntry::make('policy'),
-                        TextEntry::make('equipment')
-                            ->listWithLineBreaks()
-                            ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : $state),
+                            ->label('Facility')
+                            ->icon('heroicon-o-building-office'),
+                        TextEntry::make('purpose')
+                            ->icon('heroicon-o-clipboard-document-list'),
                         TextEntry::make('status')
                             ->badge()
+                            ->icon('heroicon-o-clock')
                             ->color(fn(string $state): string => match ($state) {
                                 'pending' => 'info',
                                 'in_review' => 'warning',
-                                'approved' => 'primary',
+                                'approved' => 'success',
                                 'denied' => 'danger',
                             }),
                     ])
-                    ->columns(3),
+                    ->columns(2)
+                    ->collapsible(),
+
+                Section::make('Date & Time')
+                    ->schema([
+                        TextEntry::make('booking_date')
+                            ->date()
+                            ->icon('heroicon-o-calendar'),
+                        TextEntry::make('start_time')
+                            ->time()
+                            ->icon('heroicon-o-clock')
+                            ->label('Start Time'),
+                        TextEntry::make('duration')
+                            ->icon('heroicon-o-clock'),
+                        TextEntry::make('end_time')
+                            ->time()
+                            ->icon('heroicon-o-clock')
+                            ->label('End Time'),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
+                Section::make('Additional Details')
+                    ->schema([
+                        TextEntry::make('participants')
+                            ->icon('heroicon-o-user-group'),
+                        TextEntry::make('equipment')
+                            ->placeholder('No equipment provided')
+                            ->formatStateUsing(function ($state) {
+                                if (empty($state)) {
+                                    return 'No equipment requested';
+                                }
+
+                                $equipment = is_string($state) ? json_decode($state, true) : $state;
+
+                                if (!is_array($equipment)) {
+                                    return 'Invalid equipment data';
+                                }
+
+                                $equipmentLabels = [
+                                    'plastic_chairs' => 'Plastic Chairs',
+                                    'long_table' => 'Long Table',
+                                    'teacher_table' => 'Teacher\'s Table',
+                                    'backdrop' => 'Backdrop',
+                                    'riser' => 'Riser',
+                                    'armed_chair' => 'Armed Chairs',
+                                    'pole' => 'Pole',
+                                    'rostrum' => 'Rostrum',
+                                ];
+
+                                $formattedEquipment = collect($equipment)
+                                    ->map(function ($quantity, $item) use ($equipmentLabels) {
+                                        $label = $equipmentLabels[$item] ?? ucfirst(str_replace('_', ' ', $item));
+                                        return "{$label}: {$quantity}";
+                                    })
+                                    ->join(', ');
+
+                                return $formattedEquipment ?: 'No equipment requested';
+                            }),
+                        TextEntry::make('policy')
+                            ->markdown()
+                            ->placeholder('No policy provided')
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible(),
+
                 Section::make('Approval Details')
-                ->schema([
-                    TextEntry::make('formatted_signatories')
-                        ->label('Approvals')
-                        ->listWithLineBreaks(),
-                ]),
+                    ->schema([
+                        TextEntry::make('formatted_signatories')
+                            ->listWithLineBreaks()
+                            ->placeholder('No approvals yet')
+                            ->formatStateUsing(fn($state) => $state),
+                    ])
+                    ->collapsible(),
+
+                Section::make('Attachments')
+                    ->schema([
+                        TextEntry::make('booking_attachments')
+                            ->listWithLineBreaks()
+                            ->placeholder('No files attached')
+                            ->formatStateUsing(function ($state) {
+                                if (!is_array($state)) {
+                                    return $state;
+                                }
+
+                                return collect($state)->map(function ($path) {
+                                    $fileName = basename($path);
+                                    $url = \Illuminate\Support\Facades\Storage::url($path);
+                                    return "<a href='{$url}' target='_blank'>{$fileName}</a>";
+                                })->toArray();
+                            })
+                            ->html(),
+                    ])
+                    ->collapsible(),
             ]);
     }
 
     protected function getTableActions(): array
     {
         return [
-            Action::make('view')
-                ->icon('heroicon-o-eye')
-                ->modalContent(function (Booking $record) {
-                    return $this->bookingInfolist($record)->render();
-                })
-                ->modalSubmitAction(false)
-                ->modalCancelAction(false),
-            Action::make('approve')
-                ->icon('heroicon-o-check')
-                ->color('success')
-                ->action(fn(Booking $record) => $this->approveBooking($record))
-                ->visible(fn(Booking $record): bool => $this->canApprove($record)),
-            Action::make('deny')
-                ->icon('heroicon-o-x-mark')
-                ->color('danger')
-                ->action(fn(Booking $record) => $this->denyBooking($record))
-                ->visible(fn(Booking $record): bool => $this->canDeny($record)),
+            ActionGroup::make([
+                Action::make('view')
+                    ->icon('heroicon-o-eye')
+                    ->modalContent(function (Booking $record) {
+                        return $this->bookingInfolist($record)->render();
+                    })
+                    ->slideOver(true)
+                    ->modalSubmitAction(false)
+                    ->modalCancelAction(false),
+                Action::make('approve')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->action(fn(Booking $record) => $this->approveBooking($record))
+                    ->requiresConfirmation()
+                    ->visible(fn(Booking $record): bool => $this->canApprove($record)),
+                Action::make('deny')
+                    ->icon('heroicon-o-x-mark')
+                    ->color('danger')
+                    ->action(fn(Booking $record) => $this->denyBooking($record))
+                    ->requiresConfirmation()
+                    ->visible(fn(Booking $record): bool => $this->canDeny($record)),
+            ]),
         ];
     }
 

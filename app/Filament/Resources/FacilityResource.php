@@ -77,11 +77,6 @@ class FacilityResource extends Resource
     {
         return $table
         ->columns([
-
-            ImageColumn::make('facility_image')
-                ->label('Facility Image')
-                ->sortable(),
-
             TextColumn::make('facility_name')
                 ->label('Facility Name')
                 ->sortable()

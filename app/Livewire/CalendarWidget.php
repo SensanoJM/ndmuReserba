@@ -91,6 +91,14 @@ class CalendarWidget extends FullCalendarWidget
         return $dateTime->setTime($time->hour, $time->minute, $time->second);
     }
 
+    /**
+     * Maps a Booking model to an EventData instance.
+     *
+     * @param  \App\Models\Booking  $booking
+     * @param  \Carbon\Carbon  $start
+     * @param  \Carbon\Carbon  $end
+     * @return array
+     */
     private function createEventData(Booking $booking, Carbon $start, Carbon $end): array
     {
         return EventData::make()

@@ -2,6 +2,10 @@
 
 namespace App\Providers\Filament;
 
+use App\Livewire\BookingStatsOverview;
+use App\Livewire\CalendarWidget;
+use App\Livewire\FacilityUsageWidget;
+use App\Livewire\RecentRequestsWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -9,7 +13,6 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Saade\FilamentFullCalendar\FilamentFullCalendarPlugin;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -27,6 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->darkMode(false)
+            ->sidebarWidth('15rem')
             ->path('admin')
             ->login(\App\Filament\Auth\AdminLogin::class)
             ->registration()
@@ -49,8 +53,11 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->databaseNotifications()
             ->widgets([
-                //
+                BookingStatsOverview::class,
+                CalendarWidget::class,
+                FacilityUsageWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
