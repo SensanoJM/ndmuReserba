@@ -30,7 +30,7 @@ class TrackingCard extends Component implements HasForms, HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories'))
+            ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories', 'approvers', 'equipment', 'attachments'))
             ->columns([
                 Split::make([
                     Stack::make([
@@ -52,22 +52,11 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->color(fn($record) => $record->reservation?->admin_approval_date ? 'primary' : 'danger')
                             ->alignCenter(),
                     ])->space(1),
-                    Stack::make([
-                        $this->createApprovalColumn('Adviser', 'adviser'),
-                    ])->space(1),
-                    Stack::make([
-                        $this->createApprovalColumn('Dean', 'dean'),
-                    ])->space(1),
-                    Stack::make([
-                        $this->createApprovalColumn('President', 'school_president'),
-                    ])->space(1),
-                    Stack::make([
-                        $this->createApprovalColumn('Director', 'school_director'),
-                    ])->space(1),
+                    $this->createApprovalColumn('Adviser', 'adviser'),
+                    $this->createApprovalColumn('Dean', 'dean'),
+                    $this->createApprovalColumn('President', 'school_president'),
+                    $this->createApprovalColumn('Director', 'school_director'),
                 ])->from('md'),
-            ])
-            ->filters([
-                // Add any filters you need
             ])
             ->actions([
                 ActionGroup::make([
@@ -87,14 +76,12 @@ class TrackingCard extends Component implements HasForms, HasTable
                         ->action(fn(Booking $record) => $this->cancelBooking($record)),
                 ]),
             ])
-            ->bulkActions([
-                // Add bulk actions if needed
-            ])
             ->emptyStateIcon('heroicon-o-bookmark')
             ->emptyStateHeading('No bookings')
             ->emptyStateDescription('Once you make a booking, it will appear here.')
             ->poll('10s');
     }
+
     public function bookingInfolist(Booking $record): Infolist
     {
         return Infolist::make()
@@ -179,9 +166,14 @@ class TrackingCard extends Component implements HasForms, HasTable
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
                         TextEntry::make('equipment')
-                            ->bulleted()
+                            ->label('Equipment')
                             ->listWithLineBreaks()
-                            ->placeholder('No equipment provided'),
+                            ->formatStateUsing(function ($state, Booking $record) {
+                                return $record->equipment->map(function ($equipment) {
+                                    return "{$equipment->name}: {$equipment->pivot->quantity}";
+                                })->join("\n");
+                            })
+                            ->placeholder('No equipment requested'),
                         TextEntry::make('policy')
                             ->markdown()
                             ->placeholder('No policy provided')
@@ -192,18 +184,17 @@ class TrackingCard extends Component implements HasForms, HasTable
 
                 Section::make('Attachments')
                     ->schema([
-                        TextEntry::make('booking_attachments')
+                        TextEntry::make('attachments')
                             ->label('Attached Files')
                             ->listWithLineBreaks()
-                            ->placeholder('No files attached')
-                            ->formatStateUsing(function ($state) {
-                                if (!$state instanceof Collection) {
-                                    $state = collect([$state]);
-                                }
-                                return $state->map(function ($attachment) {
-                                    return $attachment->name;
-                                });
-                            }),
+                            ->formatStateUsing(function ($state, Booking $record) {
+                                return $record->attachments->map(function ($attachment) {
+                                    $url = asset('storage/' . $attachment->file_path);
+                                    return "<a href='{$url}' target='_blank'>{$attachment->file_name}</a>";
+                                })->join("\n");
+                            })
+                            ->html()
+                            ->placeholder('No files attached'),
                     ])
                     ->collapsed(true)
                     ->collapsible(),
@@ -224,6 +215,9 @@ class TrackingCard extends Component implements HasForms, HasTable
 
         // Delete the booking and related records
         $booking->reservation()->delete();
+        $booking->approvers()->delete();
+        $booking->equipment()->detach();
+        $booking->attachments()->delete();
         $booking->delete();
 
         Notification::make()

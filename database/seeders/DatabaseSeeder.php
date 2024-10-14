@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Livewire\ReservationTable;
 use App\Models\Department;
+use App\Models\Signatory;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Mail\PendingMail;
@@ -87,9 +89,10 @@ class DatabaseSeeder extends Seeder
         // Invoke other seeders here
         $this->call([
             FacilitySeeder::class, // Seeds facilities
+            EquipmentSeeder::class, // Seeds equipment
             BookingSeeder::class, // Seeds Approved Bookings for the current month (Calendar view)
-            PendingBookingSeeder::class, // Seeds Pending Bookings for the near future
+            ReservationSeeder::class, // Seeds Approved Bookings for the current month (Calendar view)
+            SignatorySeeder::class, // Seeds signatories
         ]);
-
     }
 }

@@ -2,7 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Models\Approver;
+use App\Models\Attachment;
 use App\Models\Booking;
+use App\Models\Equipment;
 use App\Models\Facility;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -10,7 +13,6 @@ use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Tabs\Tab;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
@@ -27,7 +29,6 @@ use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Actions\Action as TableAction;
-use Filament\Tables\Actions\Modal\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
@@ -36,6 +37,8 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -53,6 +56,17 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     public $isAvailable = true;
 
     public ?array $data = [];
+
+    protected $equipmentOptions = [
+        'plastic_chairs' => 'Plastic Chairs',
+        'long_table' => 'Long Table',
+        'teacher_table' => 'Teacher\'s Table',
+        'backdrop' => 'Backdrop',
+        'riser' => 'Riser',
+        'armed_chair' => 'Armed Chairs',
+        'pole' => 'Pole',
+        'rostrum' => 'Rostrum',
+    ];
 
     public function mount(): void
     {
@@ -76,12 +90,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ])
             ->columns([
                 Stack::make([
-                    // Image and main content
                     ImageColumn::make('facility_image')
                         ->height(200)
                         ->extraImgAttributes(['class' => 'object-cover w-full rounded-t-lg']),
-
-                    // Main Content
                     Stack::make([
                         TextColumn::make('facility_name')
                             ->weight(FontWeight::Bold)
@@ -100,9 +111,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                             ->size('sm')
                             ->icon('heroicon-o-user-group'),
                     ])->space(1)
-                        ->extraAttributes(['class' => 'p-2 bg-white']), // Content area without flex-grow
-
-                    // Description content
+                        ->extraAttributes(['class' => 'p-2 bg-white']),
                     Stack::make([
                         TextColumn::make('description')
                             ->size('sm')
@@ -111,9 +120,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                             ->limit(30)
                             ->wrap(),
                     ])->space(3)->extraAttributes(['class' => 'p-2 bg-white']),
-                ])->extraAttributes(['class' => 'bg-white rounded-lg overflow-hidden h-full relative']), // Main card is relatively positioned
+                ])->extraAttributes(['class' => 'bg-white rounded-lg overflow-hidden h-full relative']),
             ])
-            ->actions([ // Move actions to the 'actions' method
+            ->actions([
                 TableAction::make('view')
                     ->label('View')
                     ->color('primary')
@@ -140,13 +149,20 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ->filters([
                 SelectFilter::make('facility_type')
                     ->label('Facility Type')
-                    ->options(fn() => Facility::distinct()->pluck('facility_type', 'facility_type')->toArray())
+                    ->options($this->getCachedFacilityTypes())
                     ->multiple()
                     ->preload(),
             ])
             ->filtersFormColumns(3)
             ->paginated([6, 12, 24, 'all'])
             ->deferLoading();
+    }
+
+    protected function getCachedFacilityTypes()
+    {
+        return Cache::remember('facility_types', now()->addDay(), function () {
+            return Facility::distinct()->pluck('facility_type', 'facility_type')->toArray();
+        });
     }
 
     public function facilityInfolist(Facility $facility): Infolist
@@ -246,33 +262,30 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->minValue(1),
                 ]),
 
-            Section::make('Equipment and Policy')
-                ->description('Specify any equipment needed and review the policy.')
+            Section::make('Equipment')
+                ->description('Specify any equipment needed for your booking.')
                 ->schema([
-                    Repeater::make('equipments')
+                    Repeater::make('equipment')
                         ->schema([
                             Select::make('item')
-                                ->label('Item')
-                                ->options([
-                                    'plastic_chairs' => 'Plastic Chairs',
-                                    'long_table' => 'Long Table',
-                                    'teacher_table' => 'Teacher\'s Table',
-                                    'backdrop' => 'Backdrop',
-                                    'riser' => 'Riser',
-                                    'armed_chair' => 'Armed Chairs',
-                                    'pole' => 'Pole',
-                                    'rostrum' => 'Rostrum',
-                                ]),
+                                ->label('Equipment')
+                                ->options($this->equipmentOptions)
+                                ->required(),
                             TextInput::make('quantity')
                                 ->label('Quantity')
                                 ->numeric()
-                                ->minValue(1),
+                                ->minValue(1)
+                                ->required(),
                         ])
                         ->columns(2)
                         ->defaultItems(1)
                         ->addActionLabel('Add Equipment')
                         ->collapsible()
                         ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
+                ]),
+
+            Section::make('Policy')
+                ->schema([
                     Textarea::make('policy')
                         ->label('Policy')
                         ->maxLength(1024)
@@ -282,7 +295,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             Section::make('Attachments')
                 ->description('Upload any relevant documents for your booking.')
                 ->schema([
-                    FileUpload::make('booking_attachments')
+                    FileUpload::make('attachments')
                         ->label('Booking Attachments')
                         ->directory('booking_attachments')
                         ->maxSize(10240)
@@ -294,16 +307,26 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             Section::make('Approval Contacts')
                 ->description('Provide the email addresses of the contacts to receive information for booking approval.')
                 ->schema([
-                    TextInput::make('adviser_email')
-                        ->label('Adviser/Faculty/Coach Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
-                    TextInput::make('dean_email')
-                        ->label('Dean/Head Unit Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
+                    Repeater::make('approvers')
+                        ->schema([
+                            Select::make('role')
+                                ->label('Approver Role')
+                                ->options([
+                                    'adviser' => 'Adviser/Faculty/Coach',
+                                    'dean' => 'Dean/Head Unit',
+                                ])
+                                ->required(),
+                            TextInput::make('email')
+                                ->label('Email')
+                                ->email()
+                                ->required()
+                                ->maxLength(255),
+                        ])
+                        ->columns(2)
+                        ->minItems(1)
+                        ->maxItems(2)
+                        ->addActionLabel('Add Approver')
+                        ->itemLabel(fn(array $state): ?string => $state['role'] ?? null),
                 ]),
         ];
     }
@@ -316,17 +339,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             return;
         }
 
-        $conflictingBookings = Booking::where('facility_id', $this->selectedFacility->id)
-            ->where('booking_date', $this->data['booking_date'])
-            ->where(function ($query) {
-                $query->whereBetween('start_time', [$this->data['start_time'], $this->data['end_time']])
-                    ->orWhereBetween('end_time', [$this->data['start_time'], $this->data['end_time']])
-                    ->orWhere(function ($query) {
-                        $query->where('start_time', '<=', $this->data['start_time'])
-                            ->where('end_time', '>=', $this->data['end_time']);
-                    });
-            })
-            ->count();
+        $conflictingBookings = $this->getConflictingBookingsCount();
 
         if ($conflictingBookings > 0) {
             $this->availabilityMessage = 'The selected time slot is not available.';
@@ -337,17 +350,49 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         }
     }
 
+    protected function getConflictingBookingsCount()
+    {
+        return Booking::where('facility_id', $this->selectedFacility->id)
+            ->where('booking_date', $this->data['booking_date'])
+            ->where(function ($query) {
+                $query->whereBetween('start_time', [$this->data['start_time'], $this->data['end_time']])
+                    ->orWhereBetween('end_time', [$this->data['start_time'], $this->data['end_time']])
+                    ->orWhere(function ($query) {
+                        $query->where('start_time', '<=', $this->data['start_time'])
+                            ->where('end_time', '>=', $this->data['end_time']);
+                    });
+            })
+            ->count();
+    }
+
     public function submitBooking(array $data, Facility $facility)
     {
         if (!$this->isAvailable) {
-            Notification::make()
-                ->title('The selected time slot is not available.')
-                ->danger()
-                ->send();
+            $this->notifyUnavailableTimeSlot();
             return;
         }
 
-        $booking = Booking::create([
+        DB::beginTransaction();
+
+        try {
+            $booking = $this->createBooking($data, $facility);
+            $this->createEquipmentEntries($booking, $data['equipment']);
+            $this->createApprovers($booking, $data);
+            $this->handleAttachments($booking, $data['attachments'] ?? []);
+
+            DB::commit();
+
+            $this->notifyBookingSuccess();
+            $this->dispatch('bookingCreated');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $this->notifyBookingError($e);
+        }
+    }
+
+    protected function createBooking(array $data, Facility $facility): Booking
+    {
+        return Booking::create([
             'facility_id' => $facility->id,
             'booking_date' => $data['booking_date'],
             'start_time' => $data['start_time'],
@@ -357,27 +402,73 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             'participants' => $data['participants'],
             'policy' => $data['policy'],
             'user_id' => Auth::id(),
-            'equipment' => $data['equipments'],
-            'adviser_email' => $data['adviser_email'],
-            'dean_email' => $data['dean_email'],
         ]);
+    }
 
-        if (!empty($data['booking_attachments'])) {
-            $paths = collect($data['booking_attachments'])->map(function ($file) {
-                return $file->store('booking_attachments', 'public');
-            })->toArray();
-
-            $booking->update(['booking_attachments' => json_encode($paths)]);
+    protected function createEquipmentEntries(Booking $booking, array $equipmentData)
+    {
+        foreach ($equipmentData as $item) {
+            $booking->equipment()->create([
+                'name' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
         }
+    }
 
-        $this->dispatch('bookingCreated');
+    protected function createApprovers(Booking $booking, array $data)
+    {
+        foreach ($data['approvers'] as $approverData) {
+            Approver::create([
+                'booking_id' => $booking->id,
+                'email' => $approverData['email'],
+                'role' => $approverData['role'],
+            ]);
+        }
+    }
 
+    protected function handleAttachments(Booking $booking, array $attachments)
+    {
+        foreach ($attachments as $file) {
+            $path = $file->store('booking_attachments', 'public');
+            Attachment::create([
+                'booking_id' => $booking->id,
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $file->getClientMimeType(),
+                'upload_date' => now(),
+            ]);
+        }
+    }
+
+    protected function notifyUnavailableTimeSlot()
+    {
+        Notification::make()
+            ->title('The selected time slot is not available.')
+            ->danger()
+            ->send();
+    }
+
+    protected function notifyBookingSuccess()
+    {
         Notification::make()
             ->title('Booking created successfully!')
             ->icon('heroicon-o-document-text')
             ->iconColor('success')
             ->body('Please wait for Signatory approval. You can Track your booking anytime.')
             ->send();
+    }
+
+    protected function notifyBookingError(\Exception $e)
+    {
+        Notification::make()
+            ->title('Error creating booking')
+            ->icon('heroicon-o-x-circle')
+            ->iconColor('danger')
+            ->body('An error occurred while creating your booking. Please try again later.')
+            ->send();
+
+        // Log the error for debugging
+        \Illuminate\Support\Facades\Log::error('Booking creation error: ' . $e->getMessage());
     }
 
     public function openFacilityDetails($facilityId)

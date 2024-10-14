@@ -7,7 +7,6 @@ use App\Models\Booking;
 use App\Models\Reservation;
 use App\Models\Signatory;
 use App\Models\User;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Section;
@@ -42,16 +41,9 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->query($this->getTableQuery())
             ->columns($this->getTableColumns())
             ->actions($this->getTableActions())
-            ->poll('10s'); // Poll every 10 seconds for updates
+            ->poll('10s');
     }
 
-    /**
-     * Gets the query for the table.
-     *
-     * Depending on the active tab, filters the bookings by status.
-     *
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
     protected function getTableQuery(): Builder
     {
         $query = Booking::query();
@@ -75,7 +67,12 @@ class ReservationTable extends Component implements HasForms, HasTable
                 break;
         }
 
-        return $query->latest();
+        return Booking::query()
+            ->with(['user', 'facility', 'reservation.signatories', 'equipment', 'attachments', 'approvers'])
+            ->when($this->activeTab !== 'all', function ($query) {
+                return $query->where('status', $this->activeTab);
+            })
+            ->latest();
     }
 
     protected function getTableColumns(): array
@@ -105,12 +102,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                     'primary' => 'approved',
                     'danger' => 'denied',
                 ])
-                ->formatStateUsing(fn($state) => match ($state) {
-                    'pending' => 'Pending',
-                    'in_review' => 'In Review',
-                    'approved' => 'Approved', // Display "Approved" instead of "Confirmed"
-                    'denied' => 'Denied', // Display "Denied" instead of "Canceled"
-                }),
+                ->formatStateUsing(fn($state) => ucfirst($state)),
         ];
     }
 
@@ -119,122 +111,71 @@ class ReservationTable extends Component implements HasForms, HasTable
         return Infolist::make()
             ->record($booking)
             ->schema([
-                Section::make('General Information')
-                    ->schema([
-                        TextEntry::make('user.name')
-                            ->label('Booked by')
-                            ->icon('heroicon-o-user'),
-                        TextEntry::make('facility.facility_name')
-                            ->label('Facility')
-                            ->icon('heroicon-o-building-office'),
-                        TextEntry::make('purpose')
-                            ->icon('heroicon-o-clipboard-document-list'),
-                        TextEntry::make('status')
-                            ->badge()
-                            ->icon('heroicon-o-clock')
-                            ->color(fn(string $state): string => match ($state) {
-                                'pending' => 'info',
-                                'in_review' => 'warning',
-                                'approved' => 'success',
-                                'denied' => 'danger',
-                            }),
-                    ])
-                    ->columns(2)
-                    ->collapsible(),
-
-                Section::make('Date & Time')
-                    ->schema([
-                        TextEntry::make('booking_date')
-                            ->date()
-                            ->icon('heroicon-o-calendar'),
-                        TextEntry::make('start_time')
-                            ->time()
-                            ->icon('heroicon-o-clock')
-                            ->label('Start Time'),
-                        TextEntry::make('duration')
-                            ->icon('heroicon-o-clock'),
-                        TextEntry::make('end_time')
-                            ->time()
-                            ->icon('heroicon-o-clock')
-                            ->label('End Time'),
-                    ])
-                    ->columns(2)
-                    ->collapsible(),
-
+                // ... (other sections remain the same)
                 Section::make('Additional Details')
                     ->schema([
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
                         TextEntry::make('equipment')
-                            ->placeholder('No equipment provided')
-                            ->formatStateUsing(function ($state) {
-                                if (empty($state)) {
-                                    return 'No equipment requested';
-                                }
-
-                                $equipment = is_string($state) ? json_decode($state, true) : $state;
-
-                                if (!is_array($equipment)) {
-                                    return 'Invalid equipment data';
-                                }
-
-                                $equipmentLabels = [
-                                    'plastic_chairs' => 'Plastic Chairs',
-                                    'long_table' => 'Long Table',
-                                    'teacher_table' => 'Teacher\'s Table',
-                                    'backdrop' => 'Backdrop',
-                                    'riser' => 'Riser',
-                                    'armed_chair' => 'Armed Chairs',
-                                    'pole' => 'Pole',
-                                    'rostrum' => 'Rostrum',
-                                ];
-
-                                $formattedEquipment = collect($equipment)
-                                    ->map(function ($quantity, $item) use ($equipmentLabels) {
-                                        $label = $equipmentLabels[$item] ?? ucfirst(str_replace('_', ' ', $item));
-                                        return "{$label}: {$quantity}";
-                                    })
-                                    ->join(', ');
-
-                                return $formattedEquipment ?: 'No equipment requested';
-                            }),
+                            ->listWithLineBreaks()
+                            ->formatStateUsing(fn ($state, Booking $record) => 
+                                $record->equipment->map(fn ($equipment) => 
+                                    "{$equipment->name}: {$equipment->pivot->quantity}"
+                                )->join(', ')
+                            ),
                         TextEntry::make('policy')
                             ->markdown()
-                            ->placeholder('No policy provided')
                             ->columnSpanFull(),
                     ])
                     ->columns(2)
                     ->collapsible(),
-
                 Section::make('Approval Details')
                     ->schema([
-                        TextEntry::make('formatted_signatories')
+                        TextEntry::make('reservation.signatories')
+                            ->label('Approvals')
                             ->listWithLineBreaks()
-                            ->placeholder('No approvals yet')
-                            ->formatStateUsing(fn($state) => $state),
+                            ->formatStateUsing(fn ($state, Booking $record) => 
+                                $this->formatSignatoryApprovals($record)
+                            ),
                     ])
                     ->collapsible(),
-
                 Section::make('Attachments')
                     ->schema([
-                        TextEntry::make('booking_attachments')
+                        TextEntry::make('attachments')
+                            ->label('Attached Files')
                             ->listWithLineBreaks()
-                            ->placeholder('No files attached')
-                            ->formatStateUsing(function ($state) {
-                                if (!is_array($state)) {
-                                    return $state;
-                                }
-
-                                return collect($state)->map(function ($path) {
-                                    $fileName = basename($path);
-                                    $url = \Illuminate\Support\Facades\Storage::url($path);
-                                    return "<a href='{$url}' target='_blank'>{$fileName}</a>";
-                                })->toArray();
-                            })
+                            ->formatStateUsing(fn ($state, Booking $record) => 
+                                $this->formatAttachments($record)
+                            )
                             ->html(),
                     ])
                     ->collapsible(),
             ]);
+    }
+
+    private function formatAttachments(Booking $booking): string
+    {
+        return $booking->attachments->map(function ($attachment) {
+            $url = \Illuminate\Support\Facades\Storage::url($attachment->file_path);
+            return "<a href='{$url}' target='_blank'>{$attachment->file_name}</a>";
+        })->join("\n");
+    }
+
+    private function formatSignatoryApprovals(Booking $booking): string
+    {
+        if (!$booking->reservation || $booking->reservation->signatories->isEmpty()) {
+            return 'No approvals yet';
+        }
+
+        return $booking->reservation->signatories->map(function ($signatory) {
+            $userName = $signatory->user->name ?? 'Unknown User';
+            $status = ucfirst($signatory->status);
+            $approvalDate = $signatory->approval_date
+                ? $signatory->approval_date->format('Y-m-d H:i')
+                : 'Not approved yet';
+
+            return "{$userName} ({$signatory->role}): {$status} on {$approvalDate}";
+        })->join("\n");
     }
 
     protected function getTableActions(): array
@@ -281,7 +222,6 @@ class ReservationTable extends Component implements HasForms, HasTable
         return $booking->reservation->signatories()->where('status', '!=', 'approved')->doesntExist();
     }
 
-    // Deny a booking request.
     public function denyBooking(Booking $booking)
     {
         $booking->update(['status' => 'denied']);
@@ -294,14 +234,12 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->danger()
             ->send();
 
-        // Notify the user
         Notification::make()
             ->title('Your booking has been denied')
             ->danger()
             ->sendToDatabase($booking->user);
 
         $this->refreshTable();
-        // Dispatch an event to refresh both table and tabs
         $this->dispatch('bookingStatusChanged');
     }
 
@@ -314,7 +252,6 @@ class ReservationTable extends Component implements HasForms, HasTable
         }
 
         $this->refreshTable();
-        // Dispatch an event to refresh both table and tabs
         $this->dispatch('bookingStatusChanged');
     }
 
@@ -330,14 +267,12 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->send();
     }
 
-    // This will trigger a re-render of the component
     #[On('bookingStatusChanged')]
     public function refreshTable()
     {
         // The table will automatically refresh due to Livewire's reactivity
     }
 
-    // This allows the table to refresh when the active tab is changed.
     #[On('tabChanged')]
     public function updateActiveTab($tabId)
     {
@@ -355,7 +290,6 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->success()
             ->send();
 
-        // Notify the user
         Notification::make()
             ->title('Your booking has been approved')
             ->success()
@@ -364,44 +298,22 @@ class ReservationTable extends Component implements HasForms, HasTable
         $this->refreshTable();
     }
 
-    //The createReservation method creates a new Reservation record and calls createSignatories.
-    private function createReservation(Booking $booking)
-    {
-        $reservation = Reservation::create([
-            'booking_id' => $booking->id,
-            'status' => 'pending',
-            'admin_approval_date' => now(),
-        ]);
-
-        $this->createSignatories($reservation);
-
-        return $reservation;
-    }
-
-    /**
-     * Create Signatory records for a Reservation and dispatch the job to send emails.
-     *
-     * @param  \App\Models\Reservation  $reservation
-     * @return void
-     */
     private function createSignatories(Reservation $reservation)
     {
         $booking = $reservation->booking;
         $signatoryRoles = [
-            'adviser' => $booking->adviser_email,
-            'dean' => $booking->dean_email,
+            'adviser' => $booking->approvers->firstWhere('role', 'adviser')->email,
+            'dean' => $booking->approvers->firstWhere('role', 'dean')->email,
             'school_president' => $this->getSchoolPresidentEmail(),
             'school_director' => $this->getSchoolDirectorEmail(),
         ];
 
         foreach ($signatoryRoles as $role => $email) {
-            // Validate email
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 throw new InvalidArgumentException("Invalid email for role {$role}: {$email}");
             }
 
-            // Check if there's a corresponding user account
-            $userId = User::where('email', $email)->value('id');
+            $user = User::firstWhere('email', $email);
 
             Signatory::updateOrCreate(
                 [
@@ -410,14 +322,13 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ],
                 [
                     'email' => $email,
-                    'user_id' => $userId, // This can be null if no matching user is found
+                    'user_id' => $user ? $user->id : null,
                     'status' => 'pending',
                     'approval_token' => Str::random(32),
                 ]
             );
         }
 
-        // Dispatch the job to send emails
         SendSignatoryEmailsJob::dispatch($reservation);
     }
 

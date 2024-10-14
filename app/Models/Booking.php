@@ -11,30 +11,33 @@ class Booking extends Model
     use HasFactory, BookingCacheInvalidation;
 
     protected $fillable = [
-        'user_id',
-        'facility_id',
-        'booking_date',
-        'start_time',
-        'end_time',
-        'purpose',
-        'duration',
-        'participants',
-        'policy',
-        'equipment',
-        'booking_attachments',
-        'adviser_email',
-        'dean_email',
-        'status',
+        'user_id', 'facility_id', 'booking_date', 'start_time', 'end_time',
+        'purpose', 'duration', 'participants', 'policy', 'status'
     ];
 
     protected $casts = [
         'booking_date' => 'date',
         'start_time' => 'datetime',
         'end_time' => 'datetime',
-        'equipment' => 'array',
         'participants' => 'integer',
-        'booking_attachments' => 'array',
     ];
+
+    public function approvers()
+    {
+        return $this->hasMany(Approver::class);
+    }
+
+    public function equipment()
+    {
+        return $this->belongsToMany(Equipment::class, 'booking_equipment')
+                    ->withPivot('quantity');
+    }
+
+    
+    public function attachments()
+    {
+        return $this->hasMany(Attachment::class);
+    }
 
     public function facility()
     {
@@ -68,5 +71,13 @@ class Booking extends Model
 
             return "{$userName} ({$signatory->role}): {$status} on {$approvalDate}";
         })->join("\n");
+    }
+
+    public function deleteRelatedRecords()
+    {
+        $this->reservation()->delete();
+        $this->approvers()->delete();
+        $this->equipment()->detach();
+        $this->attachments()->delete();
     }
 }

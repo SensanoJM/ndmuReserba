@@ -17,17 +17,11 @@ return new class extends Migration
             $table->string('duration');
             $table->integer('participants');
             $table->date('booking_date');
-            $table->json('booking_attachments')->nullable();
-            $table->json('equipment')->nullable();
             $table->string('policy')->nullable();
             $table->enum('status', ['pending', 'in_review', 'approved', 'denied'])->default('pending'); // pending, in_review, approved, denied
             $table->time('start_time');
             $table->time('end_time');
             $table->timestamps();
-
-            // Signatories 
-            $table->string('adviser_email'); // Adviser/Faculty/Coach
-            $table->string('dean_email'); // Dean/Head Unit
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

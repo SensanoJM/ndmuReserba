@@ -2,76 +2,68 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Facility;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FacilitySeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
+    private $facilityTypes = ['Classroom', 'Laboratory', 'Auditorium', 'Gymnasium', 'Conference Room', 'Library'];
+    private $buildingNames = ['Main Building', 'Science Complex', 'Arts Center', 'Sports Facility', 'Student Center'];
+
     public function run(): void
     {
-        // Seed Facilities
-        Facility::create([
-            'facility_name' => 'Auditorium',
-            'facility_type' => 'Indoor',
-            'capacity' => 500,
-            'building_name' => 'Main Building',
-            'floor_level' => 1,
-            'room_number' => 'A101',
-            'description' => 'A large auditorium for events and seminars.',
-            'facility_image' => 'facility-images\lakecentralhs13.jpg',
-            'status' => true,
-        ]);
+        $imagePath = database_path('seeders/facility_images');
+        $files = glob($imagePath . '/*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+
+        foreach ($files as $file) {
+            $this->createFacilityFromImage($file);
+        }
+    }
+
+    private function createFacilityFromImage($imagePath)
+    {
+        $fileName = basename($imagePath);
+        $destinationPath = 'facility-images/' . $fileName;
+
+        // Copy image to public storage
+        Storage::disk('public')->put($destinationPath, file_get_contents($imagePath));
+
+        // Generate facility data
+        $facilityName = $this->generateFacilityName();
+        $facilityType = $this->facilityTypes[array_rand($this->facilityTypes)];
+        $buildingName = $this->buildingNames[array_rand($this->buildingNames)];
 
         Facility::create([
-            'facility_name' => 'Computer Lab',
-            'facility_type' => 'Lab',
-            'capacity' => 30,
-            'building_name' => 'Science Building',
-            'floor_level' => 2,
-            'room_number' => 'B202',
-            'description' => 'A computer lab with 30 workstations.',
-            'facility_image' => 'facility-images\Contemporary_Computer_Lab.jpg',
+            'facility_name' => $facilityName,
+            'facility_type' => $facilityType,
+            'capacity' => rand(20, 500),
+            'building_name' => $buildingName,
+            'floor_level' => rand(1, 5),
+            'room_number' => $this->generateRoomNumber(),
+            'description' => $this->generateDescription($facilityName, $facilityType),
+            'facility_image' => $destinationPath,
             'status' => true,
         ]);
+    }
 
-        Facility::create([
-            'facility_name' => 'Gymnasium',
-            'facility_type' => 'Indoor',
-            'capacity' => 300,
-            'building_name' => 'Sports Complex',
-            'floor_level' => 1,
-            'room_number' => 'G101',
-            'description' => 'A fully equipped gymnasium for sports and events.',
-            'facility_image' => 'facility-images\rolfs_athletic_hall_27_feature.jpg',
-            'status' => true,
-        ]);
+    private function generateFacilityName()
+    {
+        $adjectives = ['Modern', 'Spacious', 'Advanced', 'Innovative', 'State-of-the-art'];
+        $nouns = ['Hall', 'Room', 'Center', 'Lab', 'Studio'];
 
-        Facility::create([
-            'facility_name' => 'Classroom 155',
-            'facility_type' => 'Classroom',
-            'capacity' => 40,
-            'building_name' => 'Academic Building',
-            'floor_level' => 1,
-            'room_number' => 'C102',
-            'description' => 'A standard classroom equipped with modern teaching aids.',
-            'facility_image' => 'facility-images\c1.jpg',
-            'status' => true,
-        ]);
+        return $adjectives[array_rand($adjectives)] . ' ' . $nouns[array_rand($nouns)] . ' ' . Str::random(3);
+    }
 
-        Facility::create([
-            'facility_name' => 'Classroom 101',
-            'facility_type' => 'Classroom',
-            'capacity' => 40,
-            'building_name' => 'Academic Building',
-            'floor_level' => 1,
-            'room_number' => 'C101',
-            'description' => 'A standard classroom equipped with modern teaching aids.',
-            'facility_image' => 'facility-images\Classroom-2.jpg',
-            'status' => true,
-        ]);
+    private function generateRoomNumber()
+    {
+        return strtoupper(Str::random(1)) . rand(100, 999);
+    }
+
+    private function generateDescription($name, $type)
+    {
+        return "The $name is a $type designed to accommodate various educational and extracurricular activities. " .
+               "It provides a conducive environment for learning, collaboration, and academic excellence.";
     }
 }
