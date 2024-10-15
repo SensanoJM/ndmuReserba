@@ -84,15 +84,10 @@ class ReservationTable extends Component implements HasForms, HasTable
             TextColumn::make('facility.facility_name')
                 ->label('Facility')
                 ->searchable(),
-            TextColumn::make('booking_date')
-                ->date()
-                ->sortable(),
-            TextColumn::make('start_time')
-                ->time()
-                ->sortable(),
-            TextColumn::make('end_time')
-                ->time()
-                ->sortable(),
+            TextColumn::make('booking_start')
+                ->dateTime(),
+            TextColumn::make('booking_end')
+                ->dateTime(),
             TextColumn::make('purpose')
                 ->limit(30),
             BadgeColumn::make('status')
@@ -123,9 +118,6 @@ class ReservationTable extends Component implements HasForms, HasTable
                                     "{$equipment->name}: {$equipment->pivot->quantity}"
                                 )->join(', ')
                             ),
-                        TextEntry::make('policy')
-                            ->markdown()
-                            ->columnSpanFull(),
                     ])
                     ->columns(2)
                     ->collapsible(),

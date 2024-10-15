@@ -16,11 +16,9 @@ return new class extends Migration
             $table->string('purpose');
             $table->string('duration');
             $table->integer('participants');
-            $table->date('booking_date');
-            $table->string('policy')->nullable();
             $table->enum('status', ['pending', 'in_review', 'approved', 'denied'])->default('pending'); // pending, in_review, approved, denied
-            $table->time('start_time');
-            $table->time('end_time');
+            $table->dateTime('booking_start');  // DateTime to store both date and time
+            $table->dateTime('booking_end');    // DateTime to store both date and time
             $table->timestamps();
         
             // Foreign key constraints

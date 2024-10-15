@@ -8,18 +8,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Booking extends Model
 {
-    use HasFactory, BookingCacheInvalidation;
+    use HasFactory;
 
     protected $fillable = [
-        'user_id', 'facility_id', 'booking_date', 'start_time', 'end_time',
-        'purpose', 'duration', 'participants', 'policy', 'status'
+        'user_id', 'facility_id', 'booking_start', 'booking_end', // Updated to booking_start and booking_end
+        'purpose', 'duration', 'participants', 'status'
     ];
 
     protected $casts = [
-        'booking_date' => 'date',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
-        'participants' => 'integer',
+        'booking_start' => 'datetime', // Updated to datetime for DateTimePicker
+        'booking_end'   => 'datetime', // Updated to datetime for DateTimePicker
+        'participants'  => 'integer',
     ];
 
     public function approvers()

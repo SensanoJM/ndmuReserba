@@ -34,6 +34,7 @@ class AdminCalendar extends Page
                     ->label('Filter by Facility')
                     ->options(Facility::pluck('facility_name', 'id'))
                     ->placeholder('All Facilities')
+                    ->searchable()
                     ->live(),
                 Select::make('user_role')
                     ->label('Filter by User Role')

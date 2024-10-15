@@ -145,16 +145,11 @@ class TrackingCard extends Component implements HasForms, HasTable
                 Section::make('Date & Time')
                     ->schema([
                         TextEntry::make('booking_date')
-                            ->date()
-                            ->icon('heroicon-o-calendar'),
+                            ->dateTime()
+                            ->icon('heroicon-o-clock'),
                         TextEntry::make('start_time')
-                            ->time()
-                            ->icon('heroicon-o-clock')
-                            ->label('Start Time'),
-                        TextEntry::make('end_time')
-                            ->time()
-                            ->icon('heroicon-o-clock')
-                            ->label('End Time'),
+                            ->dateTime()
+                            ->icon('heroicon-o-clock'),
                         TextEntry::make('duration')
                             ->icon('heroicon-o-clock'),
                     ])

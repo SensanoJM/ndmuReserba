@@ -7,7 +7,7 @@ use App\Models\Attachment;
 use App\Models\Booking;
 use App\Models\Equipment;
 use App\Models\Facility;
-use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Repeater;
@@ -15,7 +15,6 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
@@ -228,20 +227,14 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             Section::make('Booking Details')
                 ->description('Please provide the basic details for your booking.')
                 ->schema([
-                    DatePicker::make('booking_date')
-                        ->label('Booking Date')
-                        ->minDate(now()->addDay())
-                        ->required()
-                        ->reactive()
-                        ->afterStateUpdated(fn() => $this->checkAvailability()),
                     Grid::make(2)
                         ->schema([
-                            TimePicker::make('start_time')
+                            DateTimePicker::make('booking_start')
                                 ->label('Start Time')
                                 ->required()
                                 ->reactive()
                                 ->afterStateUpdated(fn() => $this->checkAvailability()),
-                            TimePicker::make('end_time')
+                            DateTimePicker::make('booking_end')
                                 ->label('End Time')
                                 ->required()
                                 ->reactive()
@@ -251,10 +244,19 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->label('Purpose')
                         ->required()
                         ->maxLength(255),
-                    TextInput::make('duration')
+                        TextInput::make('duration')
                         ->label('Duration')
-                        ->required()
-                        ->maxLength(255),
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            if ($this->data['booking_start'] && $this->data['booking_end']) {
+                                $start = \Carbon\Carbon::parse($this->data['booking_start']);
+                                $end = \Carbon\Carbon::parse($this->data['booking_end']);
+                                $duration = $end->diffForHumans($start, ['parts' => 2]);
+                                $set('duration', $duration);
+                            }
+                        }),
                     TextInput::make('participants')
                         ->label('Number of Participants')
                         ->required()
@@ -282,14 +284,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->addActionLabel('Add Equipment')
                         ->collapsible()
                         ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
-                ]),
-
-            Section::make('Policy')
-                ->schema([
-                    Textarea::make('policy')
-                        ->label('Policy')
-                        ->maxLength(1024)
-                        ->hint('Please review and accept the booking policy.'),
                 ]),
 
             Section::make('Attachments')
@@ -333,7 +327,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
 
     public function checkAvailability()
     {
-        if (!$this->data['booking_date'] || !$this->data['start_time'] || !$this->data['end_time']) {
+        if (!$this->data['booking_start'] || !$this->data['booking_end']) {
             $this->availabilityMessage = '';
             $this->isAvailable = true;
             return;
@@ -353,13 +347,12 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     protected function getConflictingBookingsCount()
     {
         return Booking::where('facility_id', $this->selectedFacility->id)
-            ->where('booking_date', $this->data['booking_date'])
             ->where(function ($query) {
-                $query->whereBetween('start_time', [$this->data['start_time'], $this->data['end_time']])
-                    ->orWhereBetween('end_time', [$this->data['start_time'], $this->data['end_time']])
+                $query->whereBetween('booking_start', [$this->data['booking_start'], $this->data['booking_end']])
+                    ->orWhereBetween('booking_end', [$this->data['booking_start'], $this->data['booking_end']])
                     ->orWhere(function ($query) {
-                        $query->where('start_time', '<=', $this->data['start_time'])
-                            ->where('end_time', '>=', $this->data['end_time']);
+                        $query->where('booking_start', '<=', $this->data['booking_start'])
+                            ->where('booking_end', '>=', $this->data['booking_end']);
                     });
             })
             ->count();
@@ -394,9 +387,8 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     {
         return Booking::create([
             'facility_id' => $facility->id,
-            'booking_date' => $data['booking_date'],
-            'start_time' => $data['start_time'],
-            'end_time' => $data['end_time'],
+            'booking_start' => $data['booking_start'],
+            'booking_end' => $data['booking_end'],
             'purpose' => $data['purpose'],
             'duration' => $data['duration'],
             'participants' => $data['participants'],

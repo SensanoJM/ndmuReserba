@@ -16,47 +16,64 @@ class BookingSeeder extends Seeder
         $users = User::all();
         $facilities = Facility::all();
 
-        // Create approved bookings
-        for ($i = 0; $i < 10; $i++) {
+        // Create some approved bookings for the current month
+        for ($i = 0; $i < 7; $i++) {
             $this->createBooking($users, $facilities, 'approved');
         }
 
-        // Create pending bookings
-        for ($i = 0; $i < 15; $i++) {
+        // Create some pending bookings
+        for ($i = 0; $i < 7; $i++) {
             $this->createBooking($users, $facilities, 'pending');
         }
     }
 
     private function createBooking($users, $facilities, $status)
     {
-        $startDate = Carbon::now()->addDays(rand(1, 30));
-        $endDate = (clone $startDate)->addHours(rand(1, 4));
+        $facility = $facilities->random();
+        $bookingStart = $this->getAvailableStartDateTime($facility);
+        $bookingEnd = (clone $bookingStart)->addHours(rand(1, 4));
 
         $booking = Booking::create([
             'purpose' => ucfirst($status) . ' Event ' . rand(1000, 9999),
-            'duration' => $startDate->diffInHours($endDate) . ' hours',
+            'duration' => $bookingStart->diffInHours($bookingEnd) . ' hours',
             'participants' => rand(5, 50),
-            'booking_date' => $startDate->toDateString(),
-            'policy' => 'Standard event policy applies',
+            'booking_start' => $bookingStart,
+            'booking_end' => $bookingEnd,
             'status' => $status,
-            'start_time' => $startDate->toTimeString(),
-            'end_time' => $endDate->toTimeString(),
             'user_id' => $users->random()->id,
-            'facility_id' => $facilities->random()->id,
+            'facility_id' => $facility->id,
         ]);
 
-        // Create approvers for the booking
         $this->createApprovers($booking);
     }
 
-    /**
-     * Create approvers for a booking.
-     *
-     * The approvers are: adviser and dean.
-     *
-     * @param Booking $booking
-     * @return void
-     */
+    private function getAvailableStartDateTime($facility)
+    {
+        $startDateTime = Carbon::now()->addDays(rand(1, 30))->setTime(rand(8, 20), 0, 0); // Set hours between 8 AM and 8 PM
+
+        while ($this->isTimeSlotConflicting($facility, $startDateTime)) {
+            $startDateTime->addHour();
+        }
+
+        return $startDateTime;
+    }
+
+    private function isTimeSlotConflicting($facility, $startDateTime)
+    {
+        $endDateTime = (clone $startDateTime)->addHours(4); // Maximum duration of 4 hours
+
+        return Booking::where('facility_id', $facility->id)
+            ->where(function ($query) use ($startDateTime, $endDateTime) {
+                $query->whereBetween('booking_start', [$startDateTime, $endDateTime])
+                    ->orWhereBetween('booking_end', [$startDateTime, $endDateTime])
+                    ->orWhere(function ($query) use ($startDateTime, $endDateTime) {
+                        $query->where('booking_start', '<=', $startDateTime)
+                            ->where('booking_end', '>=', $endDateTime);
+                    });
+            })
+            ->exists();
+    }
+
     private function createApprovers($booking)
     {
         $approverRoles = ['adviser', 'dean'];
@@ -64,7 +81,7 @@ class BookingSeeder extends Seeder
         foreach ($approverRoles as $role) {
             Approver::create([
                 'booking_id' => $booking->id,
-                'email' => 'sensanomarlu@gmail.com',
+                'email' => $role . '_' . rand(1000, 9999) . '@example.com',
                 'role' => $role,
             ]);
         }
