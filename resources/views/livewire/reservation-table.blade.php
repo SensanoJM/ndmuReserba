@@ -7,3 +7,10 @@
         {{ $this->table }}
     </div>
 </div>
+<script>
+    document.addEventListener('livewire:initialized', () => {
+        Livewire.on('refresh-page', () => {
+            location.reload();
+        });
+    });
+</script>

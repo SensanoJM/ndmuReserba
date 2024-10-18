@@ -29,13 +29,17 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
+            ->brandName('GreenKey')
+            ->brandLogo(asset('storage/images/GreenKey.png'))
+            ->brandLogoHeight('2rem')
+            ->favicon(asset('storage/images/logo.png'))
             ->darkMode(false)
             ->sidebarWidth('15rem')
             ->path('admin')
             ->login(\App\Filament\Auth\AdminLogin::class)
             ->registration()
             ->passwordReset()
-            ->emailVerification()
+            // ->emailVerification()
             ->profile()
             ->colors([
                 'primary' => Color::Emerald,

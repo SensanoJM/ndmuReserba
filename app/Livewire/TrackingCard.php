@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Booking;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Filament\Infolists\Components\Fieldset;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
@@ -21,6 +22,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use Illuminate\Support\Facades\Storage;
 
 class TrackingCard extends Component implements HasForms, HasTable
 {
@@ -87,7 +89,7 @@ class TrackingCard extends Component implements HasForms, HasTable
         return Infolist::make()
             ->record($record)
             ->schema([
-                Section::make('Approval Progress')
+                Fieldset::make('Approval Progress')
                     ->schema([
                         TextEntry::make('reservation.admin_approval_date')
                             ->label('Pre-booking Approval')
@@ -121,42 +123,38 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->color('primary')
                             ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_director')),
                     ])
-                    ->columns(2)
-                    ->collapsible(),
+                    ->columns(2),
 
-                Section::make('General Information')
+                Fieldset::make('General Information')
                     ->schema([
                         TextEntry::make('facility.facility_name')
                             ->label('Facility')
-                            ->icon('heroicon-o-building-office'),
+                            ->icon('heroicon-o-building-office-2'),
                         TextEntry::make('purpose')
-                            ->icon('heroicon-o-clipboard-document-list'),
+                            ->icon('heroicon-o-pencil'),
                         TextEntry::make('status')
                             ->badge()
                             ->colors([
                                 'danger' => 'denied',
-                                'warning' => 'pending',
+                                'info' => 'pending',
                                 'success' => 'approved',
                             ]),
                     ])
-                    ->columns(3)
-                    ->collapsible(),
+                    ->columns(3),
 
-                Section::make('Date & Time')
-                    ->schema([
-                        TextEntry::make('booking_date')
-                            ->dateTime()
-                            ->icon('heroicon-o-clock'),
-                        TextEntry::make('start_time')
-                            ->dateTime()
-                            ->icon('heroicon-o-clock'),
-                        TextEntry::make('duration')
-                            ->icon('heroicon-o-clock'),
-                    ])
-                    ->columns(2)
-                    ->collapsible(),
+                Fieldset::make('Date & Time')
+                ->schema([
+                    TextEntry::make('booking_start')
+                        ->label('Start Date')
+                        ->iconColor('primary')
+                        ->icon('heroicon-o-calendar'),
+                    TextEntry::make('booking_end')
+                        ->label('End Date')
+                        ->iconColor('warning')
+                        ->icon('heroicon-o-calendar'),
+                ]),
 
-                Section::make('Additional Details')
+                Fieldset::make('Additional Details')
                     ->schema([
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
@@ -169,30 +167,25 @@ class TrackingCard extends Component implements HasForms, HasTable
                                 })->join("\n");
                             })
                             ->placeholder('No equipment requested'),
-                        TextEntry::make('policy')
-                            ->markdown()
-                            ->placeholder('No policy provided')
-                            ->columnSpanFull(),
                     ])
-                    ->columns(2)
-                    ->collapsible(),
+                    ->columns(2),
 
-                Section::make('Attachments')
+                    Fieldset::make('Attachments')
                     ->schema([
                         TextEntry::make('attachments')
-                            ->label('Attached Files')
+                            ->placeholder('No files attached')
                             ->listWithLineBreaks()
                             ->formatStateUsing(function ($state, Booking $record) {
+                                if ($record->attachments->isEmpty()) {
+                                    return 'No files attached';
+                                }
                                 return $record->attachments->map(function ($attachment) {
-                                    $url = asset('storage/' . $attachment->file_path);
+                                    $url = Storage::url($attachment->file_path);
                                     return "<a href='{$url}' target='_blank'>{$attachment->file_name}</a>";
                                 })->join("\n");
                             })
-                            ->html()
-                            ->placeholder('No files attached'),
-                    ])
-                    ->collapsed(true)
-                    ->collapsible(),
+                            ->html(),
+                    ]),
             ]);
     }
 

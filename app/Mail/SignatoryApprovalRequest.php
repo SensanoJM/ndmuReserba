@@ -10,6 +10,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Illuminate\Mail\Mailables\Attachment;
 
 class SignatoryApprovalRequest extends Mailable
 {
@@ -49,7 +50,8 @@ class SignatoryApprovalRequest extends Mailable
                     ->subject('Approval Request for Reservation')
                     ->with([
                         'approvalUrl' => $this->approvalUrl,
-                        'denialUrl' => $this->denialUrl
+                        'denialUrl' => $this->denialUrl,
+                        'attachments' => $this->attachments,
                     ]);
     }
 
@@ -70,8 +72,31 @@ class SignatoryApprovalRequest extends Mailable
     {
         return new Content(
             view: 'emails.signatory-approval-request',
+            with: [
+                'formattedEquipment' => $this->formatEquipment(),
+            ]
         );
     }
+
+    protected function formatEquipment(): string
+{
+    $equipment = $this->reservation->booking->equipment;
+    if (empty($equipment)) {
+        return 'No equipment requested';
+    }
+
+    if (is_string($equipment)) {
+        return $equipment;
+    }
+
+    if (is_array($equipment)) {
+        return collect($equipment)->map(function ($quantity, $name) {
+            return "$name: $quantity";
+        })->join(', ');
+    }
+
+    return 'Equipment data format is invalid';
+}
 
     /**
      * Get the attachments for the message.
@@ -80,6 +105,10 @@ class SignatoryApprovalRequest extends Mailable
      */
     public function attachments(): array
     {
-        return [];
+        return $this->reservation->booking->attachments->map(function ($attachment) {
+            return Attachment::fromStorage($attachment->file_path)
+                             ->as($attachment->file_name)
+                             ->withMime($attachment->file_type);
+        })->toArray();
     }
 }

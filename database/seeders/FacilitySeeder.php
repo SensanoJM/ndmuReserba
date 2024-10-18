@@ -9,61 +9,101 @@ use Illuminate\Support\Str;
 
 class FacilitySeeder extends Seeder
 {
-    private $facilityTypes = ['Classroom', 'Laboratory', 'Auditorium', 'Gymnasium', 'Conference Room', 'Library'];
-    private $buildingNames = ['Main Building', 'Science Complex', 'Arts Center', 'Sports Facility', 'Student Center'];
-
-    public function run(): void
+    public function run()
     {
-        $imagePath = database_path('seeders/facility_images');
-        $files = glob($imagePath . '/*.{jpg,jpeg,png,gif}', GLOB_BRACE);
+        $facilities = [
+            [
+                'facility_name' => 'Business Office Floor 1',
+                'facility_type' => 'Open Area',
+                'capacity' => 100,
+                'building_name' => 'Business Office Building',
+                'floor_level' => 1,
+                'room_number' => 'N/A',
+                'description' => 'Large open area venue for major and minor events and conferences.',
+                'facility_image' => 'facility-images/bo_floor1.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'Business Office Floor 3',
+                'facility_type' => 'Open Area',
+                'capacity' => 100,
+                'building_name' => 'Business Office Building',
+                'floor_level' => 3,
+                'room_number' => 'N/A',
+                'description' => 'Large open area venue for major and minor events and conferences.',
+                'facility_image' => 'facility-images/bo_floor3.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'Teston Computer Lab 3017',
+                'facility_type' => 'Laboratory',
+                'capacity' => 40,
+                'building_name' => 'Teston Building',
+                'floor_level' => 3,
+                'room_number' => '3017',
+                'description' => 'Computer lab with high-speed internet.',
+                'facility_image' => 'facility-images/com_lab.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'CBA Conference Hall',
+                'facility_type' => 'Conference Hall',
+                'capacity' => 80,
+                'building_name' => 'Sta. Theresa Hall',
+                'floor_level' => 1,
+                'room_number' => 'N/A',
+                'description' => 'Medium capacity conference hall for meetings and special events.',
+                'facility_image' => 'facility-images/cba_auditorium.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'NDMU Gym',
+                'facility_type' => 'Open Area',
+                'capacity' => 400,
+                'building_name' => 'NDMU Gymnasium Building',
+                'floor_level' => 1,
+                'room_number' => 'N/A',
+                'description' => 'Large gymnasium for sports events and student activities.',
+                'facility_image' => 'facility-images/ndmu_gym.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'Ohmer Classroom 2001',
+                'facility_type' => 'Classroom',
+                'capacity' => 25,
+                'building_name' => 'Ohmer Building',
+                'floor_level' => 1,
+                'room_number' => '2001',
+                'description' => 'Small classroom for students with limited space.',
+                'facility_image' => 'facility-images/classroom_cba.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'SMC Hall',
+                'facility_type' => 'Auditorium',
+                'capacity' => 150,
+                'building_name' => 'SMC Building',
+                'floor_level' => 1,
+                'room_number' => 'N/A',
+                'description' => 'Large lecture/event hall with tiered seating.',
+                'facility_image' => 'facility-images/smc_hall.jpg', // You can change this filename
+                'status' => true,
+            ],
+            [
+                'facility_name' => 'St. Theresa Classroom 1001',
+                'facility_type' => 'Classroom',
+                'capacity' => 25,
+                'building_name' => 'St. Theresa Building',
+                'floor_level' => 1,
+                'room_number' => '1001',
+                'description' => 'Small classroom for students with limited space.',
+                'facility_image' => 'facility-images/classroom_csd.jpg', // You can change this filename
+                'status' => true,
+            ],
+        ];
 
-        foreach ($files as $file) {
-            $this->createFacilityFromImage($file);
+        foreach ($facilities as $facility) {
+            Facility::create($facility);
         }
-    }
-
-    private function createFacilityFromImage($imagePath)
-    {
-        $fileName = basename($imagePath);
-        $destinationPath = 'facility-images/' . $fileName;
-
-        // Copy image to public storage
-        Storage::disk('public')->put($destinationPath, file_get_contents($imagePath));
-
-        // Generate facility data
-        $facilityName = $this->generateFacilityName();
-        $facilityType = $this->facilityTypes[array_rand($this->facilityTypes)];
-        $buildingName = $this->buildingNames[array_rand($this->buildingNames)];
-
-        Facility::create([
-            'facility_name' => $facilityName,
-            'facility_type' => $facilityType,
-            'capacity' => rand(20, 500),
-            'building_name' => $buildingName,
-            'floor_level' => rand(1, 5),
-            'room_number' => $this->generateRoomNumber(),
-            'description' => $this->generateDescription($facilityName, $facilityType),
-            'facility_image' => $destinationPath,
-            'status' => true,
-        ]);
-    }
-
-    private function generateFacilityName()
-    {
-        $adjectives = ['Modern', 'Spacious', 'Advanced', 'Innovative', 'State-of-the-art'];
-        $nouns = ['Hall', 'Room', 'Center', 'Lab', 'Studio'];
-
-        return $adjectives[array_rand($adjectives)] . ' ' . $nouns[array_rand($nouns)] . ' ' . Str::random(3);
-    }
-
-    private function generateRoomNumber()
-    {
-        return strtoupper(Str::random(1)) . rand(100, 999);
-    }
-
-    private function generateDescription($name, $type)
-    {
-        return "The $name is a $type designed to accommodate various educational and extracurricular activities. " .
-               "It provides a conducive environment for learning, collaboration, and academic excellence.";
     }
 }

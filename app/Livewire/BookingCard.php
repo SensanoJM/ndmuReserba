@@ -79,6 +79,23 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ->statePath('data');
     }
 
+    /**
+     * A table that displays the list of facilities.
+     *
+     * The table is queried with the `Facility::query()` method, and it displays the following columns
+     *
+     *
+     * The table has the following actions:
+     *
+     * - `view`: A primary outlined button that opens a slide-over with the facility's details.
+     * - `book`: A primary button that opens a slide-over with a form to book the facility.
+     *
+     * The table also has the following filters:
+     *
+     * - `facility_type`: A select filter that allows the user to filter the facilities by type.
+     *
+     * The table is paginated with the following options: 6, 12, 24, 'all'.
+     */
     public function table(Table $table): Table
     {
         return $table
@@ -90,8 +107,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ->columns([
                 Stack::make([
                     ImageColumn::make('facility_image')
-                        ->height(200)
-                        ->extraImgAttributes(['class' => 'object-cover w-full rounded-t-lg']),
+                        ->height('100%')
+                        ->width('100%')
+                        ->extraImgAttributes(['class' => 'object-cover w-full h-full rounded-t-lg']),
                     Stack::make([
                         TextColumn::make('facility_name')
                             ->weight(FontWeight::Bold)
@@ -164,6 +182,12 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         });
     }
 
+    /**
+     * Provides a detailed view of a facility
+     *
+     * @param Facility $facility
+     * @return Infolist
+     */
     public function facilityInfolist(Facility $facility): Infolist
     {
         return Infolist::make()
@@ -221,6 +245,11 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ]);
     }
 
+    /**
+     * Defines the form schema for the booking card.
+     *
+     * @return array
+     */
     protected function getFormSchema(): array
     {
         return [
@@ -245,18 +274,8 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->required()
                         ->maxLength(255),
                         TextInput::make('duration')
-                        ->label('Duration')
-                        ->disabled()
-                        ->dehydrated(false)
-                        ->reactive()
-                        ->afterStateUpdated(function ($state, callable $set) {
-                            if ($this->data['booking_start'] && $this->data['booking_end']) {
-                                $start = \Carbon\Carbon::parse($this->data['booking_start']);
-                                $end = \Carbon\Carbon::parse($this->data['booking_end']);
-                                $duration = $end->diffForHumans($start, ['parts' => 2]);
-                                $set('duration', $duration);
-                            }
-                        }),
+                        ->label('Indicate Duration of Booking')
+                        ->required(),
                     TextInput::make('participants')
                         ->label('Number of Participants')
                         ->required()
@@ -271,13 +290,11 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->schema([
                             Select::make('item')
                                 ->label('Equipment')
-                                ->options($this->equipmentOptions)
-                                ->required(),
+                                ->options($this->equipmentOptions),
                             TextInput::make('quantity')
                                 ->label('Quantity')
                                 ->numeric()
-                                ->minValue(1)
-                                ->required(),
+                                ->minValue(1),
                         ])
                         ->columns(2)
                         ->defaultItems(1)
@@ -301,26 +318,16 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             Section::make('Approval Contacts')
                 ->description('Provide the email addresses of the contacts to receive information for booking approval.')
                 ->schema([
-                    Repeater::make('approvers')
-                        ->schema([
-                            Select::make('role')
-                                ->label('Approver Role')
-                                ->options([
-                                    'adviser' => 'Adviser/Faculty/Coach',
-                                    'dean' => 'Dean/Head Unit',
-                                ])
-                                ->required(),
-                            TextInput::make('email')
-                                ->label('Email')
-                                ->email()
-                                ->required()
-                                ->maxLength(255),
-                        ])
-                        ->columns(2)
-                        ->minItems(1)
-                        ->maxItems(2)
-                        ->addActionLabel('Add Approver')
-                        ->itemLabel(fn(array $state): ?string => $state['role'] ?? null),
+                    TextInput::make('adviser_email')
+                        ->label('Adviser/Faculty/Coach Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
+                    TextInput::make('dean_email')
+                        ->label('Dean/Head Unit Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
                 ]),
         ];
     }
@@ -328,19 +335,26 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     public function checkAvailability()
     {
         if (!$this->data['booking_start'] || !$this->data['booking_end']) {
-            $this->availabilityMessage = '';
             $this->isAvailable = true;
             return;
         }
-
+    
         $conflictingBookings = $this->getConflictingBookingsCount();
-
+    
         if ($conflictingBookings > 0) {
-            $this->availabilityMessage = 'The selected time slot is not available.';
             $this->isAvailable = false;
+            Notification::make()
+                ->title('Time Slot Unavailable')
+                ->body('The selected time slot is not available. Please choose a different time.')
+                ->danger()
+                ->send();
         } else {
-            $this->availabilityMessage = 'The selected time slot is available.';
             $this->isAvailable = true;
+            Notification::make()
+                ->title('Time Slot Available')
+                ->body('The selected time slot is available.')
+                ->success()
+                ->send();
         }
     }
 
@@ -371,7 +385,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             $booking = $this->createBooking($data, $facility);
             $this->createEquipmentEntries($booking, $data['equipment']);
             $this->createApprovers($booking, $data);
-            $this->handleAttachments($booking, $data['attachments'] ?? []);
+            if (!empty($data['attachments'])) {
+                $this->handleAttachments($booking, $data['attachments']);
+            }
 
             DB::commit();
 
@@ -392,7 +408,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             'purpose' => $data['purpose'],
             'duration' => $data['duration'],
             'participants' => $data['participants'],
-            'policy' => $data['policy'],
             'user_id' => Auth::id(),
         ]);
     }
@@ -409,18 +424,27 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
 
     protected function createApprovers(Booking $booking, array $data)
     {
-        foreach ($data['approvers'] as $approverData) {
-            Approver::create([
-                'booking_id' => $booking->id,
-                'email' => $approverData['email'],
-                'role' => $approverData['role'],
-            ]);
-        }
+        Approver::create([
+            'booking_id' => $booking->id,
+            'email' => $data['adviser_email'],
+            'role' => 'adviser',
+        ]);
+    
+        Approver::create([
+            'booking_id' => $booking->id,
+            'email' => $data['dean_email'],
+            'role' => 'dean',
+        ]);
     }
 
     protected function handleAttachments(Booking $booking, array $attachments)
     {
+        
         foreach ($attachments as $file) {
+            if (!$file instanceof \Illuminate\Http\UploadedFile) {
+                continue; // Skip if not a file object
+            }
+            
             $path = $file->store('booking_attachments', 'public');
             Attachment::create([
                 'booking_id' => $booking->id,

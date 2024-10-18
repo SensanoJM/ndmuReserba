@@ -10,13 +10,27 @@
     
     <p>Please review the reservation details below:</p>
     
-    <h2>Booking Details:</h2>
+    <p>The purpose of this reservation is for: {{ $reservation->booking->purpose ?? 'N/A' }}</p>
+
+    <p>Booking Details:</p>
     <ul>
-        <li>User: {{ $reservation->booking->user->name ?? 'N/A' }}</li>
+        <li>Requester: {{ $reservation->booking->user->name ?? 'N/A' }}</li>
         <li>Facility: {{ $reservation->booking->facility->facility_name ?? 'N/A' }}</li>
-        <li>Date: {{ optional($reservation->booking->booking_date)->format('Y-m-d') ?? 'N/A' }}</li>
-        <li>Time: {{ optional($reservation->booking->start_time)->format('H:i') ?? 'N/A' }} - 
-            {{ optional($reservation->booking->end_time)->format('H:i') ?? 'N/A' }}</li>
+        <li>Time Start: {{ optional($reservation->booking->booking_start)->format('Y-m-d H:i') ?? 'N/A' }}</li>
+        <li>Time End: {{ optional($reservation->booking->booking_end)->format('Y-m-d H:i') ?? 'N/A' }}</li>
+    </ul>
+    
+    <p>Additional Details:</p>
+    <ul>
+        <li>Participants: {{ $reservation->booking->participants ?? 'N/A' }}</li>
+        {{-- <li>Equipment: {{ $formattedEquipment }}</li>
+        <li>Attachments: 
+            @if($reservation->booking->attachments->isNotEmpty())
+                {{ $reservation->booking->attachments->pluck('file_name')->join(', ') }}
+            @else
+                No attachments
+            @endif
+        </li> --}}
     </ul>
     
     <p>To approve the request, click the approval link below:</p>

@@ -8,6 +8,7 @@ use App\Models\Facility;
 use App\Models\Approver;
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
+use App\Enums\BookingStatus;
 
 class BookingSeeder extends Seeder
 {
@@ -27,6 +28,16 @@ class BookingSeeder extends Seeder
         }
     }
 
+    /**
+     * Creates a booking with the given status and randomly assigns a facility,
+     * start and end times, number of participants, and user.
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @param \Illuminate\Support\Collection $facilities
+     * @param string $status
+     *
+     * @return void
+     */
     private function createBooking($users, $facilities, $status)
     {
         $facility = $facilities->random();
@@ -81,7 +92,7 @@ class BookingSeeder extends Seeder
         foreach ($approverRoles as $role) {
             Approver::create([
                 'booking_id' => $booking->id,
-                'email' => $role . '_' . rand(1000, 9999) . '@example.com',
+                'email' => 'sensanomarlu@gmail.com',
                 'role' => $role,
             ]);
         }

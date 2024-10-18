@@ -13,7 +13,7 @@ class DepartmentSeeder extends Seeder
             'College of Engineering Architecture and Computing',
             'College of Arts and Science',
             'College of Education',
-            'College of Business Administration'
+            'College of Business Administration',
         ];
 
         foreach ($departments as $department) {

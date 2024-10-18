@@ -11,6 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use App\Models\Reservation;
 use App\Models\Signatory;
 use Illuminate\Support\Str;
+use Illuminate\Mail\Mailables\Attachment;
 
 class DirectorApprovalRequest extends Mailable
 {
@@ -37,7 +38,6 @@ class DirectorApprovalRequest extends Mailable
     
         $this->approvalUrl = $director->approval_url;
         $this->denialUrl = $director->deny_url;
-        
         $this->previousApprovals = $this->getPreviousApprovals();
     }
 
@@ -73,7 +73,7 @@ class DirectorApprovalRequest extends Mailable
                         return [
                             'name' => $signatory->user->name,
                             'role' => $signatory->role,
-                            'approval_date' => $signatory->approval_date
+                            'approval_date' => $signatory->approval_date,
                         ];
                     });
     }
@@ -95,8 +95,32 @@ class DirectorApprovalRequest extends Mailable
     {
         return new Content(
             view: 'emails.director-approval-request',
+            with: [
+                'formattedEquipment' => $this->formatEquipment(),
+                'previousApprovals' => $this->previousApprovals,
+            ]
         );
     }
+
+    protected function formatEquipment(): string
+{
+    $equipment = $this->reservation->booking->equipment;
+    if (empty($equipment)) {
+        return 'No equipment requested';
+    }
+
+    if (is_string($equipment)) {
+        return $equipment;
+    }
+
+    if (is_array($equipment)) {
+        return collect($equipment)->map(function ($quantity, $name) {
+            return "$name: $quantity";
+        })->join(', ');
+    }
+
+    return 'Equipment data format is invalid';
+}
 
     /**
      * Get the attachments for the message.
@@ -105,6 +129,10 @@ class DirectorApprovalRequest extends Mailable
      */
     public function attachments(): array
     {
-        return [];
+        return $this->reservation->booking->attachments->map(function ($attachment) {
+            return Attachment::fromStorage($attachment->file_path)
+                             ->as($attachment->file_name)
+                             ->withMime($attachment->file_type);
+        })->toArray();
     }
 }
