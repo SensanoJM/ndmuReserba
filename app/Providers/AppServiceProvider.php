@@ -10,6 +10,9 @@ use App\Observers\ReservationObserver;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Colors\Color;
 use App\Livewire\CalendarWidget;
+use App\Repositories\FacilityRepository;
+use App\Services\ReservationService;
+use App\Services\BookingService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,7 +21,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(FacilityRepository::class, function ($app) {
+            return new FacilityRepository();
+        });
+
+        $this->app->bind(ReservationService::class, function ($app) {
+            return new ReservationService();
+        });
+
+        $this->app->bind(BookingService::class, function ($app) {
+            return new BookingService();
+        });
     }
 
     /**

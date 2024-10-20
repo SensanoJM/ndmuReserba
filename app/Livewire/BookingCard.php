@@ -2,18 +2,17 @@
 
 namespace App\Livewire;
 
-use App\Models\Approver;
-use App\Models\Attachment;
-use App\Models\Booking;
-use App\Models\Equipment;
+use App\Events\BookingCreatedEvent;
+use App\Http\Requests\BookingFormRequest;
 use App\Models\Facility;
+use App\Repositories\FacilityRepository;
+use App\Services\BookingService;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -35,10 +34,9 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Livewire\Attributes\On;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -51,7 +49,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
 
     public $isSlideOverOpen = false;
     public $selectedFacility = null;
-    public $availabilityMessage = '';
     public $isAvailable = true;
 
     public ?array $data = [];
@@ -67,35 +64,116 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         'rostrum' => 'Rostrum',
     ];
 
+    protected $facilityRepository;
+    protected $bookingService;
+
+    public function boot(FacilityRepository $facilityRepository, BookingService $bookingService)
+    {
+        $this->facilityRepository = $facilityRepository;
+        $this->bookingService = $bookingService;
+    }
+
     public function mount(): void
     {
         $this->form->fill();
     }
 
-    public function form(Form $form): Form
+    protected function getFormSchema(): array
     {
-        return $form
-            ->schema($this->getFormSchema())
-            ->statePath('data');
+        return [
+            Section::make('Booking Details')
+                ->description('Please provide the basic details for your booking.')
+                ->schema([
+                    Grid::make(2)
+                        ->schema([
+                            DateTimePicker::make('booking_start')
+                                ->label('Start Time')
+                                ->required()
+                                ->minDate(now()) // Prevent selecting dates before today
+                                ->reactive()
+                                ->afterStateUpdated(function (callable $set, $state) {
+                                    if ($state && Carbon::parse($state)->isPast()) {
+                                        $set('booking_start', null);
+                                        Notification::make()
+                                            ->title('Invalid Date')
+                                            ->body('You cannot book a date in the past.')
+                                            ->danger()
+                                            ->send();
+                                    } else {
+                                        $this->checkAvailability();
+                                    }
+                                }),
+                            DateTimePicker::make('booking_end')
+                                ->label('End Time')
+                                ->required()
+                                ->minDate(now()) // Prevent selecting dates before today
+                                ->reactive()
+                                ->after('booking_start')
+                                ->afterStateUpdated(fn() => $this->checkAvailability()),
+                        ]),
+                    TextInput::make('purpose')
+                        ->label('Purpose')
+                        ->required()
+                        ->maxLength(255),
+                    TextInput::make('duration')
+                        ->label('Indicate Duration of Booking')
+                        ->required(),
+                    TextInput::make('participants')
+                        ->label('Number of Participants')
+                        ->required()
+                        ->integer()
+                        ->minValue(1),
+                ]),
+
+            Section::make('Equipment')
+                ->description('Specify any equipment needed for your booking.')
+                ->schema([
+                    Repeater::make('equipment')
+                        ->schema([
+                            Select::make('item')
+                                ->label('Equipment')
+                                ->options($this->equipmentOptions),
+                            TextInput::make('quantity')
+                                ->label('Quantity')
+                                ->numeric()
+                                ->minValue(1),
+                        ])
+                        ->columns(2)
+                        ->defaultItems(1)
+                        ->addActionLabel('Add Equipment')
+                        ->collapsible()
+                        ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
+                ]),
+
+            Section::make('Attachments')
+                ->description('Upload any relevant documents for your booking.')
+                ->schema([
+                    FileUpload::make('attachments')
+                        ->label('Booking Attachments')
+                        ->directory('booking_attachments')
+                        ->maxSize(10240)
+                        ->multiple()
+                        ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'])
+                        ->helperText('Max file size: 10MB. Accepted types: PDF, DOC, DOCX, TXT'),
+                ]),
+
+            Section::make('Approval Contacts')
+                ->description('Provide the email addresses of the contacts to receive information for booking approval.')
+                ->schema([
+                    TextInput::make('adviser_email')
+                        ->label('Adviser/Faculty/Coach Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
+                    TextInput::make('dean_email')
+                        ->label('Dean/Head Unit Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255),
+                ]),
+        ];
     }
 
-    /**
-     * A table that displays the list of facilities.
-     *
-     * The table is queried with the `Facility::query()` method, and it displays the following columns
-     *
-     *
-     * The table has the following actions:
-     *
-     * - `view`: A primary outlined button that opens a slide-over with the facility's details.
-     * - `book`: A primary button that opens a slide-over with a form to book the facility.
-     *
-     * The table also has the following filters:
-     *
-     * - `facility_type`: A select filter that allows the user to filter the facilities by type.
-     *
-     * The table is paginated with the following options: 6, 12, 24, 'all'.
-     */
     public function table(Table $table): Table
     {
         return $table
@@ -159,35 +237,23 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                     ->slideOver()
                     ->form($this->getFormSchema())
                     ->action(function (array $data, Facility $record): void {
-                        $this->submitBooking($data, $record);
+                        $this->data = $data; // Set the form data
+                        $this->submitBooking($record);
                     })
                     ->extraAttributes(['class' => 'w-full justify-center']),
             ])
             ->filters([
                 SelectFilter::make('facility_type')
                     ->label('Facility Type')
-                    ->options($this->getCachedFacilityTypes())
+                    ->options(fn() => $this->facilityRepository->getCachedFacilityTypes())
                     ->multiple()
                     ->preload(),
             ])
             ->filtersFormColumns(3)
             ->paginated([6, 12, 24, 'all'])
-            ->deferLoading();
+            ->deferLoading(true);
     }
 
-    protected function getCachedFacilityTypes()
-    {
-        return Cache::remember('facility_types', now()->addDay(), function () {
-            return Facility::distinct()->pluck('facility_type', 'facility_type')->toArray();
-        });
-    }
-
-    /**
-     * Provides a detailed view of a facility
-     *
-     * @param Facility $facility
-     * @return Infolist
-     */
     public function facilityInfolist(Facility $facility): Infolist
     {
         return Infolist::make()
@@ -245,222 +311,127 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ]);
     }
 
-    /**
-     * Defines the form schema for the booking card.
-     *
-     * @return array
-     */
-    protected function getFormSchema(): array
-    {
-        return [
-            Section::make('Booking Details')
-                ->description('Please provide the basic details for your booking.')
-                ->schema([
-                    Grid::make(2)
-                        ->schema([
-                            DateTimePicker::make('booking_start')
-                                ->label('Start Time')
-                                ->required()
-                                ->reactive()
-                                ->afterStateUpdated(fn() => $this->checkAvailability()),
-                            DateTimePicker::make('booking_end')
-                                ->label('End Time')
-                                ->required()
-                                ->reactive()
-                                ->afterStateUpdated(fn() => $this->checkAvailability()),
-                        ]),
-                    TextInput::make('purpose')
-                        ->label('Purpose')
-                        ->required()
-                        ->maxLength(255),
-                        TextInput::make('duration')
-                        ->label('Indicate Duration of Booking')
-                        ->required(),
-                    TextInput::make('participants')
-                        ->label('Number of Participants')
-                        ->required()
-                        ->integer()
-                        ->minValue(1),
-                ]),
-
-            Section::make('Equipment')
-                ->description('Specify any equipment needed for your booking.')
-                ->schema([
-                    Repeater::make('equipment')
-                        ->schema([
-                            Select::make('item')
-                                ->label('Equipment')
-                                ->options($this->equipmentOptions),
-                            TextInput::make('quantity')
-                                ->label('Quantity')
-                                ->numeric()
-                                ->minValue(1),
-                        ])
-                        ->columns(2)
-                        ->defaultItems(1)
-                        ->addActionLabel('Add Equipment')
-                        ->collapsible()
-                        ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
-                ]),
-
-            Section::make('Attachments')
-                ->description('Upload any relevant documents for your booking.')
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->label('Booking Attachments')
-                        ->directory('booking_attachments')
-                        ->maxSize(10240)
-                        ->multiple()
-                        ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'])
-                        ->helperText('Max file size: 10MB. Accepted types: PDF, DOC, DOCX, TXT'),
-                ]),
-
-            Section::make('Approval Contacts')
-                ->description('Provide the email addresses of the contacts to receive information for booking approval.')
-                ->schema([
-                    TextInput::make('adviser_email')
-                        ->label('Adviser/Faculty/Coach Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
-                    TextInput::make('dean_email')
-                        ->label('Dean/Head Unit Email')
-                        ->email()
-                        ->required()
-                        ->maxLength(255),
-                ]),
-        ];
-    }
-
     public function checkAvailability()
     {
-        if (!$this->data['booking_start'] || !$this->data['booking_end']) {
+        // Check if booking_start and booking_end are set
+        if (!isset($this->data['booking_start']) || !isset($this->data['booking_end'])) {
             $this->isAvailable = true;
             return;
         }
-    
-        $conflictingBookings = $this->getConflictingBookingsCount();
-    
-        if ($conflictingBookings > 0) {
-            $this->isAvailable = false;
+
+        // Check if booking_start and booking_end are not empty
+        if (empty($this->data['booking_start']) || empty($this->data['booking_end'])) {
+            $this->isAvailable = true;
+            return;
+        }
+
+        // Proceed with availability check
+        $this->isAvailable = $this->facilityRepository->checkAvailability(
+            $this->selectedFacility,
+            $this->data['booking_start'],
+            $this->data['booking_end']
+        );
+
+        $this->notifyAvailability();
+    }
+
+    /**
+     * Submit the booking form.
+     *
+     * This method is responsible for creating a new booking based on the validated form data.
+     * It will check if the selected time slot is available, and if the booking start date is not before today.
+     * If the booking is successful, it will dispatch the "bookingCreated" event.
+     *
+     * @param BookingFormRequest $request
+     * @param Facility $facility
+     *
+     * @return void
+     */
+    public function submitBooking(Facility $facility)
+    {
+        $bookingFormRequest = new BookingFormRequest();
+        $validator = Validator::make($this->data, array_merge($bookingFormRequest->rules(), [
+            'booking_start' => ['required', 'date', 'after_or_equal:' . now()->toDateTimeString()],
+            'booking_end' => ['required', 'date', 'after:booking_start'],
+        ]));
+
+        if ($validator->fails()) {
+            foreach ($validator->errors()->all() as $error) {
+                Notification::make()
+                    ->title('Validation Error')
+                    ->body($error)
+                    ->danger()
+                    ->send();
+            }
+            return;
+        }
+
+        $validatedData = $validator->validated();
+
+        // Additional check for past dates
+        if (Carbon::parse($validatedData['booking_start'])->isPast()) {
             Notification::make()
-                ->title('Time Slot Unavailable')
-                ->body('The selected time slot is not available. Please choose a different time.')
+                ->title('Invalid Booking Date')
+                ->body('You cannot book a date in the past.')
                 ->danger()
                 ->send();
-        } else {
-            $this->isAvailable = true;
-            Notification::make()
-                ->title('Time Slot Available')
-                ->body('The selected time slot is available.')
-                ->success()
-                ->send();
+            return;
         }
-    }
 
-    protected function getConflictingBookingsCount()
-    {
-        return Booking::where('facility_id', $this->selectedFacility->id)
-            ->where(function ($query) {
-                $query->whereBetween('booking_start', [$this->data['booking_start'], $this->data['booking_end']])
-                    ->orWhereBetween('booking_end', [$this->data['booking_start'], $this->data['booking_end']])
-                    ->orWhere(function ($query) {
-                        $query->where('booking_start', '<=', $this->data['booking_start'])
-                            ->where('booking_end', '>=', $this->data['booking_end']);
-                    });
-            })
-            ->count();
-    }
-
-    public function submitBooking(array $data, Facility $facility)
-    {
         if (!$this->isAvailable) {
             $this->notifyUnavailableTimeSlot();
             return;
         }
 
-        DB::beginTransaction();
-
         try {
-            $booking = $this->createBooking($data, $facility);
-            $this->createEquipmentEntries($booking, $data['equipment']);
-            $this->createApprovers($booking, $data);
-            if (!empty($data['attachments'])) {
-                $this->handleAttachments($booking, $data['attachments']);
-            }
-
-            DB::commit();
-
+            $booking = $this->bookingService->createBooking($validatedData, $facility, Auth::id());
+            event(new BookingCreatedEvent($booking));
             $this->notifyBookingSuccess();
             $this->dispatch('bookingCreated');
         } catch (\Exception $e) {
-            DB::rollBack();
             $this->notifyBookingError($e);
         }
     }
 
-    protected function createBooking(array $data, Facility $facility): Booking
+    protected function notifyInvalidBookingDate()
     {
-        return Booking::create([
-            'facility_id' => $facility->id,
-            'booking_start' => $data['booking_start'],
-            'booking_end' => $data['booking_end'],
-            'purpose' => $data['purpose'],
-            'duration' => $data['duration'],
-            'participants' => $data['participants'],
-            'user_id' => Auth::id(),
-        ]);
+        Notification::make()
+            ->title('Invalid Booking Date')
+            ->body('You cannot book a date before today.')
+            ->danger()
+            ->send();
     }
 
-    protected function createEquipmentEntries(Booking $booking, array $equipmentData)
+    protected function handleValidationErrors($exception)
     {
-        foreach ($equipmentData as $item) {
-            $booking->equipment()->create([
-                'name' => $item['item'],
-                'quantity' => $item['quantity'],
-            ]);
-        }
-    }
-
-    protected function createApprovers(Booking $booking, array $data)
-    {
-        Approver::create([
-            'booking_id' => $booking->id,
-            'email' => $data['adviser_email'],
-            'role' => 'adviser',
-        ]);
-    
-        Approver::create([
-            'booking_id' => $booking->id,
-            'email' => $data['dean_email'],
-            'role' => 'dean',
-        ]);
-    }
-
-    protected function handleAttachments(Booking $booking, array $attachments)
-    {
-        
-        foreach ($attachments as $file) {
-            if (!$file instanceof \Illuminate\Http\UploadedFile) {
-                continue; // Skip if not a file object
+        foreach ($exception->errors() as $field => $errors) {
+            foreach ($errors as $error) {
+                Notification::make()
+                    ->title('Validation Error')
+                    ->body($error)
+                    ->danger()
+                    ->send();
             }
-            
-            $path = $file->store('booking_attachments', 'public');
-            Attachment::create([
-                'booking_id' => $booking->id,
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => $path,
-                'file_type' => $file->getClientMimeType(),
-                'upload_date' => now(),
-            ]);
         }
+    }
+
+    protected function notifyAvailability()
+    {
+        $notification = Notification::make()
+            ->title($this->isAvailable ? 'Time Slot Available' : 'Time Slot Unavailable')
+            ->body($this->isAvailable ? 'The selected time slot is available.' : 'The selected time slot is not available. Please choose a different time.')
+            ->icon($this->isAvailable ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+            ->iconColor($this->isAvailable ? 'success' : 'danger');
+
+        $notification->send();
     }
 
     protected function notifyUnavailableTimeSlot()
     {
         Notification::make()
             ->title('The selected time slot is not available.')
-            ->danger()
+            ->icon('heroicon-o-x-circle')
+            ->iconColor('danger')
             ->send();
     }
 
@@ -468,7 +439,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     {
         Notification::make()
             ->title('Booking created successfully!')
-            ->icon('heroicon-o-document-text')
+            ->icon('heroicon-o-check-circle')
             ->iconColor('success')
             ->body('Please wait for Signatory approval. You can Track your booking anytime.')
             ->send();
@@ -483,19 +454,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             ->body('An error occurred while creating your booking. Please try again later.')
             ->send();
 
-        // Log the error for debugging
         \Illuminate\Support\Facades\Log::error('Booking creation error: ' . $e->getMessage());
-    }
-
-    public function openFacilityDetails($facilityId)
-    {
-        $this->dispatch('openFacilityDetails', facilityId: $facilityId);
-    }
-
-    #[On('bookingCreated')]
-    public function refreshComponent()
-    {
-        $this->resetTable();
     }
 
     public function render()

@@ -60,7 +60,6 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->widgets([
                 BookingStatsOverview::class,
-                CalendarWidget::class,
                 FacilityUsageWidget::class,
             ])
             ->middleware([

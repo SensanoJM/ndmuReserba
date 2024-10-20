@@ -4,14 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 
 class Booking extends Model
 {
     use HasFactory;
 
+    public $timestamps = true;
+
     protected $fillable = [
         'user_id', 'facility_id', 'booking_start', 'booking_end', // Updated to booking_start and booking_end
-        'purpose', 'duration', 'participants', 'status'
+        'purpose', 'duration', 'participants', 'status',
     ];
 
     protected $casts = [
@@ -30,7 +33,6 @@ class Booking extends Model
         return $this->belongsToMany(Equipment::class, 'booking_equipment')
                     ->withPivot('quantity');
     }
-
     
     public function attachments()
     {
@@ -77,5 +79,42 @@ class Booking extends Model
         $this->approvers()->delete();
         $this->equipment()->detach();
         $this->attachments()->delete();
+    }
+
+    public function scopePending(Builder $query): Builder
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeInReview(Builder $query): Builder
+    {
+        return $query->where('status', 'in_review');
+    }
+
+    public function scopeApproved(Builder $query): Builder
+    {
+        return $query->where('status', 'approved');
+    }
+
+    public function scopeDenied(Builder $query): Builder
+    {
+        return $query->where('status', 'denied');
+    }
+
+    /**
+     * Retrieves a query builder with all of the booking's relations eagerly loaded.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public static function withAllRelations(): Builder
+    {
+        return static::with([
+            'user',
+            'facility',
+            'reservation.signatories',
+            'equipment',
+            'attachments',
+            'approvers'
+        ]);
     }
 }

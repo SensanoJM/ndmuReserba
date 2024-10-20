@@ -35,16 +35,10 @@ class TrackingCard extends Component implements HasForms, HasTable
             ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories', 'approvers', 'equipment', 'attachments'))
             ->columns([
                 Split::make([
-                    Stack::make([
-                        TextColumn::make('purpose')
+                    TextColumn::make('purpose')
                             ->searchable()
                             ->weight('medium')
                             ->limit(30),
-                        TextColumn::make('facility.facility_name')
-                            ->searchable()
-                            ->color('gray')
-                            ->limit(30),
-                    ])->space(1),
                     Stack::make([
                         TextColumn::make('PreBooking')
                             ->placeholder('Pre-booking')
@@ -123,6 +117,9 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->color('primary')
                             ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_director')),
                     ])
+                    ->hidden(function (Booking $record) {
+                        return $record->status === 'denied';
+                    })
                     ->columns(2),
 
                 Fieldset::make('General Information')

@@ -24,6 +24,8 @@ class UserPanelProvider extends PanelProvider
             ->id('user')
             ->path('user')
             ->darkMode(false)
+            ->brandLogo(asset('storage/images/GreenKey.png'))
+            ->brandLogoHeight('2rem')
             ->login(\App\Filament\Auth\UserLogin::class)
             ->registration(\App\Filament\Auth\UserRegister::class)
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
