@@ -15,9 +15,9 @@ class ReservationService
     public function approveBooking(Booking $booking)
     {
         return DB::transaction(function () use ($booking) {
-            if ($booking->status === 'pending') {
+            if ($booking->status === 'prebooking') {
                 return $this->initialApprove($booking);
-            } elseif ($booking->status === 'in_review' && $this->allSignatoriesApproved($booking)) {
+            } elseif ($booking->status === 'pending' && $this->allSignatoriesApproved($booking)) {
                 return $this->finalApprove($booking);
             }
             return false;
@@ -38,7 +38,7 @@ class ReservationService
 
     public function allSignatoriesApproved(Booking $booking): bool
     {
-        return $booking->reservation->signatories()->where('status', '!=', 'approved')->doesntExist();
+        return $booking->reservation && $booking->reservation->signatories()->where('status', '!=', 'approved')->doesntExist();
     }
 
     private function initialApprove(Booking $booking)
@@ -47,7 +47,7 @@ class ReservationService
         $booking->save();
 
         $reservation = $booking->reservation()->create([
-            'status' => 'pending',
+            'status' => 'in_review',
             'admin_approval_date' => now(),
         ]);
 
@@ -56,6 +56,16 @@ class ReservationService
         SendSignatoryEmailsJob::dispatch($reservation);
 
         return true;
+    }
+
+    public function updateBookingStatusAfterSignatoryApproval(Booking $booking)
+    {
+        if ($this->allSignatoriesApproved($booking)) {
+            $booking->update(['status' => 'pending']);
+            $booking->reservation->update(['status' => 'pending']);
+            return true; // Indicates that all signatories have approved
+        }
+        return false;
     }
 
     private function finalApprove(Booking $booking)

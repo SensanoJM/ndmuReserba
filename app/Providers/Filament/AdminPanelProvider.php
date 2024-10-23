@@ -39,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->login(\App\Filament\Auth\AdminLogin::class)
             ->registration()
             ->passwordReset()
-            // ->emailVerification()
+            ->emailVerification()
             ->profile()
             ->colors([
                 'primary' => Color::Emerald,

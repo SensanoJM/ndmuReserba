@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-            $table->enum('status', ['pending', 'pending_director', 'approved', 'denied'])->default('pending');
+            $table->enum('status', ['prebooking', 'in_review', 'pending', 'approved', 'denied'])->default('prebooking');
             $table->timestamp('admin_approval_date')->nullable();
             $table->timestamp('final_approval_date')->nullable();
             $table->timestamp('director_notified_at')->nullable();

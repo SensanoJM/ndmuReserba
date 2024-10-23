@@ -51,8 +51,6 @@ class ReservationTable extends Component implements HasForms, HasTable
     protected function getTableQuery()
     {
         return Booking::withAllRelations()->latest()->tap(function ($query) {
-            Log::info($query->toSql());
-            Log::info($query->getBindings());
         });
     }
 
@@ -85,19 +83,21 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->dateTime()
             ->sortable()
             ->toggleable(),
-        TextColumn::make('status')
+            TextColumn::make('status')
                 ->badge()
                 ->color(fn (Booking $record): string => match ($record->status) {
+                    'prebooking' => 'gray',
+                    'in_review' => 'warning',
                     'pending' => 'warning',
-                    'in_review' => 'info',
                     'approved' => 'success',
                     'denied' => 'danger',
                     default => 'secondary',
                 })
                 ->formatStateUsing(function ($state) {
                     return match ($state) {
-                        'pending' => 'Pending',
+                        'prebooking' => 'Pre-booking',
                         'in_review' => 'In Review',
+                        'pending' => 'Pending Final Approval',
                         'approved' => 'Approved',
                         'denied' => 'Denied',
                         default => ucfirst($state),
@@ -113,7 +113,7 @@ class ReservationTable extends Component implements HasForms, HasTable
             ActionGroup::make([
                 Action::make('view')
                     ->icon('heroicon-s-eye')
-                    ->color('info')
+                    ->color('gray')
                     ->modalContent(fn (Booking $record) => $this->bookingInfolist($record))
                     ->modalSubmitAction(false)
                     ->modalCancelAction(false),
@@ -200,6 +200,7 @@ class ReservationTable extends Component implements HasForms, HasTable
         return [
             SelectFilter::make('status')
                 ->options([
+                    'prebooking' => 'Pre-booking',
                     'pending' => 'Pending',
                     'in_review' => 'In Review',
                     'approved' => 'Approved',
@@ -213,7 +214,7 @@ class ReservationTable extends Component implements HasForms, HasTable
 
     private function getPreBookingApprovalStatus(Booking $booking): array
     {
-        if ($booking->status === 'in_review' || $booking->status === 'approved') {
+        if ($booking->status === 'pending' || $booking->status === 'in_review' || $booking->status === 'approved') {
             return [
                 'status' => 'Approved',
                 'date' => $booking->reservation->admin_approval_date ?? now(),
@@ -236,12 +237,6 @@ class ReservationTable extends Component implements HasForms, HasTable
             return 'Pending';
         }
 
-        if ($role === 'prebooking') {
-            return $reservation->admin_approval_date
-            ? 'Approved on ' . $reservation->admin_approval_date->format('Y-m-d H:i')
-            : 'Pending';
-        }
-
         $signatory = $reservation->signatories->firstWhere('role', $role);
         if (!$signatory) {
             return 'Pending';
@@ -260,10 +255,6 @@ class ReservationTable extends Component implements HasForms, HasTable
             return 'heroicon-o-clock';
         }
 
-        if ($role === 'prebooking') {
-            return $reservation->admin_approval_date ? 'heroicon-o-check-circle' : 'heroicon-o-clock';
-        }
-
         $signatory = $reservation->signatories->firstWhere('role', $role);
         return match ($signatory?->status) {
             'approved' => 'heroicon-o-check-circle',
@@ -278,10 +269,6 @@ class ReservationTable extends Component implements HasForms, HasTable
             return 'warning';
         }
 
-        if ($role === 'prebooking') {
-            return $reservation->admin_approval_date ? 'success' : 'warning';
-        }
-
         $signatory = $reservation->signatories->firstWhere('role', $role);
         return match ($signatory?->status) {
             'approved' => 'success',
@@ -292,27 +279,25 @@ class ReservationTable extends Component implements HasForms, HasTable
 
     private function canApprove(Booking $booking): bool
     {
-        return $booking->status === 'pending' ||
-            ($booking->status === 'in_review' && $this->reservationService->allSignatoriesApproved($booking));
+        return $booking->status === 'prebooking' ||
+            ($booking->status === 'pending' && $this->reservationService->allSignatoriesApproved($booking));
     }
 
     private function canDeny(Booking $booking): bool
     {
-        return in_array($booking->status, ['pending', 'in_review']);
+        return in_array($booking->status, ['prebooking', 'in_review', 'pending']);
     }
 
     public function approveBooking(Booking $booking)
     {
-        // Store the current status
         $currentStatus = $booking->status;
 
         if ($this->reservationService->approveBooking($booking)) {
-            // Revert the status for UI purposes
             $booking->status = $currentStatus;
             
             Notification::make()
                 ->title('Booking Approved')
-                ->body('The changes will be reflected after the page refreshes.')
+                ->body('The booking status are now up to date.')
                 ->success()
                 ->send();
 
@@ -328,11 +313,9 @@ class ReservationTable extends Component implements HasForms, HasTable
 
     public function denyBooking(Booking $booking)
     {
-        // Store the current status
         $currentStatus = $booking->status;
 
         if ($this->reservationService->denyBooking($booking)) {
-            // Revert the status for UI purposes
             $booking->status = $currentStatus;
 
             Notification::make()

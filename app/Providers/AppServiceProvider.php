@@ -13,6 +13,8 @@ use App\Livewire\CalendarWidget;
 use App\Repositories\FacilityRepository;
 use App\Services\ReservationService;
 use App\Services\BookingService;
+use App\Models\Signatory;
+use App\Observers\SignatoryApprovalObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        Signatory::observe(SignatoryApprovalObserver::class);
         Reservation::observe(ReservationObserver::class);
         FilamentColor::register([
             'danger' => Color::Red,

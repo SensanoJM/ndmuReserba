@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('signatories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('reservation_id')->constrained()->onDelete('cascade');
-            $table->string('role');
+            $table->enum('role', ['adviser', 'dean', 'school_president', 'school_director']);
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->enum('status', ['pending', 'approved', 'denied'])->default('pending');
             $table->timestamp('approval_date')->nullable();

@@ -22,29 +22,26 @@ class ReservationObserver
      */
     public function created(Reservation $reservation): void
     {
-        // Only initiate the approval process if the reservation is in a 'pending' state
-        if ($reservation->status === 'pending') {
-            // Initiate the approval process
-            $this->signatory_approval_controller->initiateApprovalProcess($reservation);
+        // Only initiate the approval process if the reservation is in an 'in_review' state
+        if ($reservation->status === 'in_review') {
             // Dispatch the job to send emails simultaneously
             SendSignatoryEmailsJob::dispatch($reservation);
         }
     }
 
+
     /**
      * Handle the Reservation "updated" event.
+     *
+     * When the reservation's status is updated, this method will be called.
+     * If the status is changed to 'approved' or 'denied', it will handle
+     * the required actions. If the status is changed to 'pending' and the
+     * previous status was 'in_review', it will send an email to the
+     * school director for final approval.
      */
     public function updated(Reservation $reservation): void
     {
-        if ($reservation->isDirty('status')) {
-            if ($reservation->status === 'approved') {
-                // Handle final approval if needed
-                // For example, you might want to notify the user or update related records
-            } elseif ($reservation->status === 'denied') {
-                // Handle denial if needed
-                // For example, you might want to notify the user or update related records
-            }
-        }
+
     }
 
     /**

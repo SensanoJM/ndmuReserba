@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('purpose');
             $table->string('duration');
             $table->integer('participants');
-            $table->enum('status', ['pending', 'in_review', 'approved', 'denied'])->default('pending'); // pending, in_review, approved, denied
+            $table->enum('status', ['prebooking', 'in_review','pending', 'approved', 'denied'])->default('prebooking');
             $table->dateTime('booking_start');  // DateTime to store both date and time
             $table->dateTime('booking_end');    // DateTime to store both date and time
             $table->timestamps();

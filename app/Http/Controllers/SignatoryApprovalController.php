@@ -8,9 +8,17 @@ use App\Models\Reservation;
 use App\Models\Signatory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Services\ReservationService;
 
 class SignatoryApprovalController extends Controller
 {
+
+    protected $reservationService;
+
+    public function __construct(ReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
 
     /**
      * Approve a reservation request.
@@ -28,7 +36,11 @@ class SignatoryApprovalController extends Controller
         $signatory->approve();
     
         $reservation = $signatory->reservation;
+        $booking = $reservation->booking;
         
+        // Check if all signatories have approved and update booking status if necessary
+        $this->reservationService->updateBookingStatusAfterSignatoryApproval($booking);
+    
         // Check if this approval completes all non-director approvals
         if ($this->allNonDirectorSignatoriesApproved($reservation)) {
             $this->notifyDirector($reservation);
@@ -125,7 +137,6 @@ class SignatoryApprovalController extends Controller
             if ($email) {
                 Mail::to($email)->send(new DirectorApprovalRequest($reservation, $director));
                 $reservation->update(['director_notified_at' => now()]); // Mark as notified
-                Log::info("Director approval request sent for reservation {$reservation->id}");
             }
         }
     }
