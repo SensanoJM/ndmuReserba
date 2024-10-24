@@ -3,9 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Livewire\BookingStatsOverview;
-use App\Livewire\CalendarWidget;
 use App\Livewire\FacilityUsageWidget;
-use App\Livewire\RecentRequestsWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;

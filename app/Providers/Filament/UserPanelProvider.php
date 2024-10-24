@@ -2,7 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\BookingPage;
+use App\Filament\Pages\TrackingPage;
+use App\Livewire\UserCalendarWidget;
 use Filament\Http\Middleware\Authenticate;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\Pages;
 use Filament\PanelProvider;
@@ -13,6 +17,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Saade\FilamentFullCalendar\FilamentFullCalendarPlugin;
 
 
 class UserPanelProvider extends PanelProvider
@@ -24,13 +29,25 @@ class UserPanelProvider extends PanelProvider
             ->id('user')
             ->path('user')
             ->darkMode(false)
+            ->topNavigation()
             ->brandLogo(asset('storage/images/GreenKey.png'))
             ->brandLogoHeight('2rem')
             ->login(\App\Filament\Auth\UserLogin::class)
             ->registration(\App\Filament\Auth\UserRegister::class)
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
                 Pages\Dashboard::class,
+                BookingPage::class,
+                TrackingPage::class,
+            ])
+            ->plugin(
+                FilamentFullCalendarPlugin::make()
+                    ->selectable()
+                    ->editable()
+                    ->timezone('UTC')  // Adjust to your timezone
+                    ->locale('en')     // Adjust to your locale
+            )
+            ->widgets([
+                UserCalendarWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

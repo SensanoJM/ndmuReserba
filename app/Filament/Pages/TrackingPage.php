@@ -7,9 +7,9 @@ use Filament\Pages\Page;
 class TrackingPage extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
-    protected static ?string $navigationLabel = 'Tracking';
-    protected ?string $heading = 'Tracking Reservation';
-    protected static ?string $slug = 'track-reservation';
+    protected static ?string $navigationLabel = 'Track Bookings';
+    protected ?string $heading = 'Tracking Your Bookings';
+    protected static ?string $slug = 'track-bookings';
 
     protected static string $view = 'filament.pages.tracking-page';
 }

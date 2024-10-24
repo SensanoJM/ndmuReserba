@@ -126,9 +126,23 @@ class CalendarWidget extends FullCalendarWidget
             'eventDrop' => 'function(info) {
                 $wire.eventDrop(info.event.id, info.event.start.toISOString(), info.event.end.toISOString());
             }',
+            'selectConstraint' => [
+                'start' => now()->startOfDay()->format('Y-m-d'), // Start from today
+            ],
+            'validRange' => [
+                'start' => now()->startOfDay()->format('Y-m-d'), // Disable all dates before today
+            ],
+            'selectOverlap' => false, // Prevent selection of overlapping events
         ];
     }
 
+    /**
+     * Updates a booking with new start and end dates after a user has dropped it in the calendar.
+     *
+     * @param int $eventId The ID of the booking that was moved.
+     * @param string $newStart The new start date of the booking.
+     * @param string $newEnd The new end date of the booking.
+     */
     public function eventDrop($eventId, $newStart, $newEnd): void
     {
         $booking = Booking::findOrFail($eventId);

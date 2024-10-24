@@ -39,6 +39,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 
 class BookingCard extends Component implements HasTable, HasForms, HasInfolists
 {
@@ -89,9 +91,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                             DateTimePicker::make('booking_start')
                                 ->label('Start Time')
                                 ->required()
-                                ->minDate(now()) // Prevent selecting dates before today
+                                ->minDate(now())
                                 ->reactive()
-                                ->afterStateUpdated(function (callable $set, $state) {
+                                ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                     if ($state && Carbon::parse($state)->isPast()) {
                                         $set('booking_start', null);
                                         Notification::make()
@@ -99,25 +101,32 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                                             ->body('You cannot book a date in the past.')
                                             ->danger()
                                             ->send();
-                                    } else {
-                                        $this->checkAvailability();
+                                        return;
                                     }
+                                    
+                                    $this->checkAvailability();
+                                    $this->updateDuration($get, $set);
                                 }),
                             DateTimePicker::make('booking_end')
                                 ->label('End Time')
                                 ->required()
-                                ->minDate(now()) // Prevent selecting dates before today
+                                ->minDate(now())
                                 ->reactive()
                                 ->after('booking_start')
-                                ->afterStateUpdated(fn() => $this->checkAvailability()),
+                                ->afterStateUpdated(function (Get $get, Set $set) {
+                                    $this->checkAvailability();
+                                    $this->updateDuration($get, $set);
+                                }),
                         ]),
                     TextInput::make('purpose')
                         ->label('Purpose')
                         ->required()
                         ->maxLength(255),
                     TextInput::make('duration')
-                        ->label('Indicate Duration of Booking')
-                        ->required(),
+                        ->label('Duration')
+                        ->disabled()
+                        ->dehydrated(true) // Ensure the value is included when form is submitted
+                        ->hint('Automatically calculated from start and end times'),
                     TextInput::make('participants')
                         ->label('Number of Participants')
                         ->required()
@@ -309,6 +318,50 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                     ])
                     ->columns(3),
             ]);
+    }
+
+    protected function updateDuration(Get $get, Set $set): void
+    {
+        $start = $get('booking_start');
+        $end = $get('booking_end');
+
+        if ($start && $end) {
+            $startTime = Carbon::parse($start);
+            $endTime = Carbon::parse($end);
+
+            if ($endTime->lte($startTime)) {
+                $set('booking_end', null);
+                Notification::make()
+                    ->title('Invalid Time')
+                    ->body('End time must be after start time.')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            // Calculate the duration
+            $duration = $this->calculateDuration($startTime, $endTime);
+            $set('duration', $duration);
+        }
+    }
+
+    protected function calculateDuration(Carbon $start, Carbon $end): string
+    {
+        $totalMinutes = $start->diffInMinutes($end);
+        $hours = floor($totalMinutes / 60);
+        $minutes = $totalMinutes % 60;
+    
+        $durationParts = [];
+        
+        if ($hours > 0) {
+            $durationParts[] = "{$hours} " . ($hours === 1 ? 'hour' : 'hours');
+        }
+        
+        if ($minutes > 0) {
+            $durationParts[] = "{$minutes} " . ($minutes === 1 ? 'minute' : 'minutes');
+        }
+    
+        return implode(' ', $durationParts);
     }
 
     public function checkAvailability()
