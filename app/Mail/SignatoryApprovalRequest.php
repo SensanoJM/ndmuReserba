@@ -10,7 +10,6 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
-use Illuminate\Mail\Mailables\Attachment;
 
 class SignatoryApprovalRequest extends Mailable
 {
@@ -51,7 +50,6 @@ class SignatoryApprovalRequest extends Mailable
                     ->with([
                         'approvalUrl' => $this->approvalUrl,
                         'denialUrl' => $this->denialUrl,
-                        'attachments' => $this->attachments,
                     ]);
     }
 
@@ -105,10 +103,6 @@ class SignatoryApprovalRequest extends Mailable
      */
     public function attachments(): array
     {
-        return $this->reservation->booking->attachments->map(function ($attachment) {
-            return Attachment::fromStorage($attachment->file_path)
-                             ->as($attachment->file_name)
-                             ->withMime($attachment->file_type);
-        })->toArray();
+        return [];
     }
 }

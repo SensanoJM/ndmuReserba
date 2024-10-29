@@ -3,10 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Booking;
-use App\Models\Equipment;
 use App\Models\Facility;
-use Illuminate\Support\Facades\DB;
-use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
@@ -15,15 +12,13 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
-use Filament\Notifications\Notification;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
-use Saade\FilamentFullCalendar\Actions;
-use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
-use Illuminate\Support\Carbon;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 
 class UserCalendarWidget extends FullCalendarWidget
 {
@@ -61,6 +56,11 @@ class UserCalendarWidget extends FullCalendarWidget
                         'user' => $booking->user->name,
                         'facility' => $booking->facility->facility_name,
                     ],
+                    'editable' => false, // Ensure individual events aren't editable
+                    'startEditable' => false, // Prevent changing event start time
+                    'durationEditable' => false, // Prevent changing event duration
+                    'resourceEditable' => false, // Prevent changing event resources
+                    'display' => 'block', // Make events display as blocks without interaction
                 ];
             })
             ->toArray();
@@ -149,18 +149,6 @@ class UserCalendarWidget extends FullCalendarWidget
                         ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
                 ]),
 
-            Section::make('Attachments')
-                ->description('Upload any relevant documents for your booking.')
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->label('Booking Attachments')
-                        ->directory('booking_attachments')
-                        ->maxSize(10240)
-                        ->multiple()
-                        ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'])
-                        ->helperText('Max file size: 10MB. Accepted types: PDF, DOC, DOCX, TXT'),
-                ]),
-
             Section::make('Approval Contacts')
                 ->description('Provide the email addresses of the contacts to receive information for booking approval.')
                 ->schema([
@@ -208,20 +196,19 @@ class UserCalendarWidget extends FullCalendarWidget
         $totalMinutes = $start->diffInMinutes($end);
         $hours = floor($totalMinutes / 60);
         $minutes = $totalMinutes % 60;
-    
+
         $durationParts = [];
-        
+
         if ($hours > 0) {
             $durationParts[] = "{$hours} " . ($hours === 1 ? 'hour' : 'hours');
         }
-        
+
         if ($minutes > 0) {
             $durationParts[] = "{$minutes} " . ($minutes === 1 ? 'minute' : 'minutes');
         }
-    
+
         return implode(' ', $durationParts);
     }
-
 
     public function checkAvailability()
     {
@@ -278,87 +265,51 @@ class UserCalendarWidget extends FullCalendarWidget
             ],
             'initialView' => 'dayGridMonth',
             'editable' => false,
-            'selectable' => true,
+            'selectable' => false,
             'dayMaxEvents' => true,
             'eventDurationEditable' => false,
-            'selectConstraint' => [
-                'start' => now()->startOfDay()->format('Y-m-d'), // Start from today
-            ],
-            'validRange' => [
-                'start' => now()->startOfDay()->format('Y-m-d'), // Disable all dates before today
-            ],
             'selectOverlap' => false, // Prevent selection of overlapping events
+            'eventClick' => false, // Disable event clicking
+            'eventStartEditable' => false, // Prevent event dragging
+            'eventResizeable' => false, // Prevent event resizing
+            'eventInteractive' => false, // Make events non-interactive
+            'eventClick' => 'function(info) { return false; }', // This prevents the modal from showing up
+            'events' => true, // Keep events visible but non-interactive
         ];
     }
 
-    protected function createAction(): ?array
+    // Override the modal component to be null
+    public function getModalComponent(): ?string
     {
-        return [
-            'action' => function (array $data) {
-                try {
-                    DB::beginTransaction();
+        return null;
+    }
 
-                    // Create the booking with the data from the form
-                    $booking = Booking::create($data);  // The user_id will now be included in $data
+    // Disable all default actions
+    protected function getActions(): array
+    {
+        return [];
+    }
 
-                    // Handle equipment if present
-                    if (!empty($data['equipment'])) {
-                        foreach ($data['equipment'] as $item) {
-                            if (!empty($item['item']) && !empty($item['quantity'])) {
-                                $equipment = Equipment::firstOrCreate(['name' => $item['item']]);
-                                $booking->equipment()->attach($equipment->id, ['quantity' => $item['quantity']]);
-                            }
-                        }
-                    }
+    // Override the event click handler
+    public function onEventClick($event): void
+    {
+        // Do nothing
+    }
 
-                    // Handle attachments if present
-                    if (!empty($data['attachments'])) {
-                        foreach ($data['attachments'] as $file) {
-                            $path = $file->store('booking_attachments', 'public');
-                            $booking->attachments()->create([
-                                'file_name' => $file->getClientOriginalName(),
-                                'file_path' => $path,
-                                'file_type' => $file->getClientMimeType(),
-                                'upload_date' => now(),
-                            ]);
-                        }
-                    }
+    // Disable interaction with events
+    protected function modalActions(): array
+    {
+        return [];
+    }
 
-                    // Create approvers
-                    $booking->approvers()->createMany([
-                        [
-                            'email' => $data['adviser_email'],
-                            'role' => 'adviser',
-                        ],
-                        [
-                            'email' => $data['dean_email'],
-                            'role' => 'dean',
-                        ],
-                    ]);
-
-                    DB::commit();
-
-                    Notification::make()
-                        ->title('Booking created successfully')
-                        ->success()
-                        ->send();
-
-                    $this->refreshEvents();
-
-                } catch (\Exception $e) {
-                    DB::rollBack();
-                    
-                    Notification::make()
-                        ->title('Error creating booking')
-                        ->body($e->getMessage())
-                        ->danger()
-                        ->send();
-                }
-            },
-            'modal' => [
-                'title' => 'Create Booking',
-            ],
-        ];
+    public function eventDidMount(): string
+    {
+        return <<<JS
+        function({ event, timeText, isStart, isEnd, isMirror, isPast, isFuture, isToday, el, view }){
+            el.setAttribute("x-tooltip", "tooltip");
+            el.setAttribute("x-data", "{ tooltip: '"+event.title+"' }");
+        }
+    JS;
     }
 
     private function refreshEvents(): void

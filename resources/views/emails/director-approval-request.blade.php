@@ -24,14 +24,6 @@
     <p>Additional Details:</p>
     <ul>
         <li>Participants: {{ $reservation->booking->participants ?? 'N/A' }}</li>
-        {{-- <li>Equipment: {{ $formattedEquipment }}</li>
-        <li>Attachments: 
-            @if($reservation->booking->attachments->isNotEmpty())
-                {{ $reservation->booking->attachments->pluck('file_name')->join(', ') }}
-            @else
-                No attachments
-            @endif
-        </li> --}}
     </ul>
     
     <p>Previous Approvals:</p>

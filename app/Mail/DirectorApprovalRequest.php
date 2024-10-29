@@ -11,7 +11,6 @@ use Illuminate\Queue\SerializesModels;
 use App\Models\Reservation;
 use App\Models\Signatory;
 use Illuminate\Support\Str;
-use Illuminate\Mail\Mailables\Attachment;
 
 class DirectorApprovalRequest extends Mailable
 {
@@ -129,10 +128,6 @@ class DirectorApprovalRequest extends Mailable
      */
     public function attachments(): array
     {
-        return $this->reservation->booking->attachments->map(function ($attachment) {
-            return Attachment::fromStorage($attachment->file_path)
-                             ->as($attachment->file_name)
-                             ->withMime($attachment->file_type);
-        })->toArray();
+        return [];
     }
 }

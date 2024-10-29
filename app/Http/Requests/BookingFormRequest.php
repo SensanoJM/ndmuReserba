@@ -39,8 +39,6 @@ class BookingFormRequest extends FormRequest
             'equipment' => 'array',
             'equipment.*.item' => 'required|string',
             'equipment.*.quantity' => 'required|integer|min:1',
-            'attachments' => 'array',
-            'attachments.*' => 'file|max:10240|mimes:pdf,doc,docx,txt',
             'adviser_email' => 'required|email|max:255',
             'dean_email' => 'required|email|max:255',
         ];

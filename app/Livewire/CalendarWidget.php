@@ -4,8 +4,12 @@ namespace App\Livewire;
 
 use App\Models\Booking;
 use App\Models\Facility;
+use Carbon\Carbon;
 use Filament\Forms;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
 use Saade\FilamentFullCalendar\Actions;
@@ -14,6 +18,8 @@ use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 class CalendarWidget extends FullCalendarWidget
 {
     public Model|string|null $model = Booking::class;
+
+    public $isAvailable = true;
 
     public function fetchEvents(array $fetchInfo): array
     {
@@ -58,16 +64,99 @@ class CalendarWidget extends FullCalendarWidget
                 ->required(),
             Forms\Components\TextInput::make('purpose')
                 ->required(),
-            Forms\Components\DateTimePicker::make('booking_start')
-                ->label('Start Date and Time')
-                ->required(),
-            Forms\Components\DateTimePicker::make('booking_end')
-                ->label('End Date and Time')
-                ->required(),
+            DateTimePicker::make('booking_start')
+                ->label('Start Time')
+                ->required()
+                ->minDate(now())
+                ->reactive()
+                ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                    if ($state && Carbon::parse($state)->isPast()) {
+                        $set('booking_start', null);
+                        Notification::make()
+                            ->title('Invalid Date')
+                            ->body('You cannot book a date in the past.')
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+                    
+                    $this->checkAvailability();
+                    $this->updateDuration($get, $set);
+                }),
+            DateTimePicker::make('booking_end')
+                ->label('End Time')
+                ->required()
+                ->minDate(now())
+                ->reactive()
+                ->after('booking_start')
+                ->afterStateUpdated(function (Get $get, Set $set) {
+                    $this->checkAvailability();
+                    $this->updateDuration($get, $set);
+                }),
             Forms\Components\TextInput::make('participants')
                 ->numeric()
                 ->required(),
         ];
+    }
+
+    public function checkAvailability()
+    {
+        // Check if booking_start and booking_end are set
+        if (!isset($this->data['booking_start']) || !isset($this->data['booking_end'])) {
+            $this->isAvailable = true;
+            return;
+        }
+
+        // Check if booking_start and booking_end are not empty
+        if (empty($this->data['booking_start']) || empty($this->data['booking_end'])) {
+            $this->isAvailable = true;
+            return;
+        }
+
+        // Proceed with availability check
+        $this->isAvailable = $this->facilityRepository->checkAvailability(
+            $this->selectedFacility,
+            $this->data['booking_start'],
+            $this->data['booking_end']
+        );
+
+        $this->notifyAvailability();
+    }
+
+    protected function notifyAvailability()
+    {
+        $notification = Notification::make()
+            ->title($this->isAvailable ? 'Time Slot Available' : 'Time Slot Unavailable')
+            ->body($this->isAvailable ? 'The selected time slot is available.' : 'The selected time slot is not available. Please choose a different time.')
+            ->icon($this->isAvailable ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+            ->iconColor($this->isAvailable ? 'success' : 'danger');
+
+        $notification->send();
+    }
+
+    protected function updateDuration(Get $get, Set $set): void
+    {
+        $start = $get('booking_start');
+        $end = $get('booking_end');
+
+        if ($start && $end) {
+            $startTime = Carbon::parse($start);
+            $endTime = Carbon::parse($end);
+
+            if ($endTime->lte($startTime)) {
+                $set('booking_end', null);
+                Notification::make()
+                    ->title('Invalid Time')
+                    ->body('End time must be after start time.')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            // Calculate the duration
+            $duration = $this->calculateDuration($startTime, $endTime);
+            $set('duration', $duration);
+        }
     }
 
     protected function modalActions(): array
@@ -120,7 +209,7 @@ class CalendarWidget extends FullCalendarWidget
             ],
             'initialView' => 'dayGridMonth',
             'editable' => true,
-            'selectable' => true,
+            'selectable' => true, // https://github.com/saade/filament-fullcalendar?tab=readme-ov-file#creating-events-on-day-selection
             'dayMaxEvents' => true,
             'eventDurationEditable' => true,
             'eventDrop' => 'function(info) {

@@ -32,6 +32,7 @@ class UserPanelProvider extends PanelProvider
             ->topNavigation()
             ->brandLogo(asset('storage/images/GreenKey.png'))
             ->brandLogoHeight('2rem')
+            ->favicon(asset('storage/images/logo.png'))
             ->login(\App\Filament\Auth\UserLogin::class)
             ->registration(\App\Filament\Auth\UserRegister::class)
             ->pages([
@@ -41,8 +42,6 @@ class UserPanelProvider extends PanelProvider
             ])
             ->plugin(
                 FilamentFullCalendarPlugin::make()
-                    ->selectable()
-                    ->editable()
                     ->timezone('UTC')  // Adjust to your timezone
                     ->locale('en')     // Adjust to your locale
             )

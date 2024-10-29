@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Run the migrations. https://www.youtube.com/watch?v=wReE56xivg0&t=17s&ab_channel=R%C3%B4muloRamos
      */
     public function up(): void
     {

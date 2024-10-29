@@ -33,11 +33,6 @@ class Booking extends Model
         return $this->belongsToMany(Equipment::class, 'booking_equipment')
                     ->withPivot('quantity');
     }
-    
-    public function attachments()
-    {
-        return $this->hasMany(Attachment::class);
-    }
 
     public function facility()
     {
@@ -78,7 +73,6 @@ class Booking extends Model
         $this->reservation()->delete();
         $this->approvers()->delete();
         $this->equipment()->detach();
-        $this->attachments()->delete();
     }
 
     public function scopePending(Builder $query): Builder
@@ -113,7 +107,6 @@ class Booking extends Model
             'facility',
             'reservation.signatories',
             'equipment',
-            'attachments',
             'approvers'
         ]);
     }

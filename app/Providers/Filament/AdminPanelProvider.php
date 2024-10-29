@@ -44,8 +44,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugin(
                 FilamentFullCalendarPlugin::make()
-                    ->selectable()
-                    ->editable()
                     ->timezone('UTC')  // Adjust to your timezone
                     ->locale('en')     // Adjust to your locale
             )

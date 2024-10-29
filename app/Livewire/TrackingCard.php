@@ -6,10 +6,8 @@ use App\Models\Booking;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Fieldset;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Collection;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
@@ -32,7 +30,7 @@ class TrackingCard extends Component implements HasForms, HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories', 'approvers', 'equipment', 'attachments'))
+            ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories', 'approvers', 'equipment'))
             ->columns([
                 Split::make([
                     TextColumn::make('purpose')
@@ -84,43 +82,43 @@ class TrackingCard extends Component implements HasForms, HasTable
             ->record($record)
             ->schema([
                 Fieldset::make('Approval Progress')
-                    ->schema([
-                        TextEntry::make('reservation.admin_approval_date')
-                            ->label('Pre-booking Approval')
-                            ->date()
-                            ->icon('heroicon-o-check-circle')
-                            ->iconColor('primary')
-                            ->color('primary')
-                            ->placeholder('Pending'),
-                        TextEntry::make('reservation.signatories')
-                            ->label('Adviser Approval')
-                            ->icon('heroicon-o-check-circle')
-                            ->iconColor('primary')
-                            ->color('primary')
-                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'adviser')),
-                        TextEntry::make('reservation.signatories')
-                            ->label('Dean Approval')
-                            ->icon('heroicon-o-check-circle')
-                            ->iconColor('primary')
-                            ->color('primary')
-                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'dean')),
-                        TextEntry::make('reservation.signatories')
-                            ->label('School President Approval')
-                            ->icon('heroicon-o-check-circle')
-                            ->iconColor('primary')
-                            ->color('primary')
-                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_president')),
-                        TextEntry::make('reservation.signatories')
-                            ->label('School Director Approval')
-                            ->icon('heroicon-o-check-circle')
-                            ->iconColor('primary')
-                            ->color('primary')
-                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_director')),
-                    ])
-                    ->hidden(function (Booking $record) {
-                        return $record->status === 'denied';
-                    })
-                    ->columns(2),
+                ->schema([
+                    TextEntry::make('reservation.admin_approval_date')
+                        ->label('Pre-booking Approval')
+                        ->date()
+                        ->icon(fn ($state) => $state ? 'heroicon-o-check-circle' : 'heroicon-o-clock')
+                        ->iconColor(fn ($state) => $state ? 'success' : 'warning')
+                        ->color(fn ($state) => $state ? 'success' : 'warning')
+                        ->placeholder('Pending'),
+                    TextEntry::make('reservation.signatories')
+                        ->label('Adviser Approval')
+                        ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'adviser'))
+                        ->icon(fn($state, $record) => $this->getInfolistSignatoryIcon($record->reservation->signatories, 'adviser'))
+                        ->iconColor(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'adviser'))
+                        ->color(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'adviser')),
+                    TextEntry::make('reservation.signatories')
+                        ->label('Dean Approval')
+                        ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'dean'))
+                        ->icon(fn($state, $record) => $this->getInfolistSignatoryIcon($record->reservation->signatories, 'dean'))
+                        ->iconColor(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'dean'))
+                        ->color(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'dean')),
+                    TextEntry::make('reservation.signatories')
+                        ->label('School President Approval')
+                        ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_president'))
+                        ->icon(fn($state, $record) => $this->getInfolistSignatoryIcon($record->reservation->signatories, 'school_president'))
+                        ->iconColor(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'school_president'))
+                        ->color(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'school_president')),
+                    TextEntry::make('reservation.signatories')
+                        ->label('School Director Approval')
+                        ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_director'))
+                        ->icon(fn($state, $record) => $this->getInfolistSignatoryIcon($record->reservation->signatories, 'school_director'))
+                        ->iconColor(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'school_director'))
+                        ->color(fn($state, $record) => $this->getInfolistSignatoryColor($record->reservation->signatories, 'school_director')),
+                ])
+                ->hidden(function (Booking $record) {
+                    return $record->status === 'denied';
+                })
+                ->columns(2),
 
                 Fieldset::make('General Information')
                     ->schema([
@@ -131,11 +129,24 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->icon('heroicon-o-pencil'),
                         TextEntry::make('status')
                             ->badge()
-                            ->colors([
-                                'danger' => 'denied',
-                                'info' => 'pending',
-                                'success' => 'approved',
-                            ]),
+                            ->color(fn (Booking $record): string => match ($record->status) {
+                                'prebooking' => 'gray',
+                                'in_review' => 'warning',
+                                'pending' => 'warning',
+                                'approved' => 'success',
+                                'denied' => 'danger',
+                                default => 'secondary',
+                            })
+                            ->formatStateUsing(function ($state) {
+                                return match ($state) {
+                                    'prebooking' => 'Pre-booking',
+                                    'in_review' => 'In Review',
+                                    'pending' => 'Pending Final Approval',
+                                    'approved' => 'Approved',
+                                    'denied' => 'Denied',
+                                    default => ucfirst($state),
+                                };
+                            })
                     ])
                     ->columns(3),
 
@@ -166,25 +177,44 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->placeholder('No equipment requested'),
                     ])
                     ->columns(2),
-
-                    Fieldset::make('Attachments')
-                    ->schema([
-                        TextEntry::make('attachments')
-                            ->placeholder('No files attached')
-                            ->listWithLineBreaks()
-                            ->formatStateUsing(function ($state, Booking $record) {
-                                if ($record->attachments->isEmpty()) {
-                                    return 'No files attached';
-                                }
-                                return $record->attachments->map(function ($attachment) {
-                                    $url = Storage::url($attachment->file_path);
-                                    return "<a href='{$url}' target='_blank'>{$attachment->file_name}</a>";
-                                })->join("\n");
-                            })
-                            ->html(),
-                    ]),
             ]);
     }
+
+    protected function getInfolistSignatoryIcon($signatories, $role): string
+{
+    if (!$signatories instanceof \Illuminate\Support\Collection) {
+        return 'heroicon-o-clock';
+    }
+
+    $signatory = $signatories->firstWhere('role', $role);
+    if (!$signatory) {
+        return 'heroicon-o-clock';
+    }
+
+    return match ($signatory->status) {
+        'approved' => 'heroicon-o-check-circle',
+        'denied' => 'heroicon-o-x-circle',
+        default => 'heroicon-o-clock',
+    };
+}
+
+protected function getInfolistSignatoryColor($signatories, $role): string
+{
+    if (!$signatories instanceof \Illuminate\Support\Collection) {
+        return 'warning';
+    }
+
+    $signatory = $signatories->firstWhere('role', $role);
+    if (!$signatory) {
+        return 'warning';
+    }
+
+    return match ($signatory->status) {
+        'approved' => 'success',
+        'denied' => 'danger',
+        default => 'warning',
+    };
+}
 
     public function cancelBooking(Booking $booking)
     {
@@ -202,7 +232,6 @@ class TrackingCard extends Component implements HasForms, HasTable
         $booking->reservation()->delete();
         $booking->approvers()->delete();
         $booking->equipment()->detach();
-        $booking->attachments()->delete();
         $booking->delete();
 
         Notification::make()

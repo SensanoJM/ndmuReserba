@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Approver;
 use App\Models\Booking;
 use App\Models\Facility;
-use App\Models\Approver;
-use App\Models\Attachment;
 use Illuminate\Support\Facades\DB;
 
 class BookingService
@@ -16,7 +15,6 @@ class BookingService
             $booking = $this->createBookingRecord($data, $facility, $userId);
             $this->createEquipmentEntries($booking, $data['equipment']);
             $this->createApprovers($booking, $data);
-            $this->handleAttachments($booking, $data['attachments']);
 
             return $booking;
         });
@@ -58,23 +56,5 @@ class BookingService
             'email' => $data['dean_email'],
             'role' => 'dean',
         ]);
-    }
-
-    private function handleAttachments(Booking $booking, array $attachments)
-    {
-        foreach ($attachments as $file) {
-            if (!$file instanceof \Illuminate\Http\UploadedFile) {
-                continue;
-            }
-            
-            $path = $file->store('booking_attachments', 'public');
-            Attachment::create([
-                'booking_id' => $booking->id,
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => $path,
-                'file_type' => $file->getClientMimeType(),
-                'upload_date' => now(),
-            ]);
-        }
     }
 }
