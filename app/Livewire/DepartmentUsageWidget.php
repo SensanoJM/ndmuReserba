@@ -2,14 +2,13 @@
 
 namespace App\Livewire;
 
-use App\Models\Facility;
+use App\Models\Department;
 use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
-use Illuminate\Support\Facades\DB;
 
-class FacilityUsageWidget extends ChartWidget
+class DepartmentUsageWidget extends ChartWidget
 {
-    protected static ?string $heading = 'Facility Usage';
+    protected static ?string $heading = 'Department Usage';
     protected int | string | array $columnSpan = 'full';
     
     public ?string $filter = 'this_month';
@@ -25,31 +24,32 @@ class FacilityUsageWidget extends ChartWidget
 
     protected function getData(): array
     {
-        $facilities = Facility::withCount(['bookings' => function ($query) {
+        $departments = Department::with(['users.booking' => function ($query) {
             $this->applyTimeRangeFilter($query);
         }])->get();
 
-        $labels = $facilities->pluck('facility_name')->toArray();
-        $bookingCounts = $facilities->pluck('bookings_count')->toArray();
+        $labels = $departments->pluck('name')->toArray();
+        $totalBookings = $departments->map(function ($department) {
+            return $department->users->flatMap->booking->count();
+        })->toArray();
 
-        $totalBookings = array_sum($bookingCounts);
-        $usagePercentages = array_map(function ($count) use ($totalBookings) {
-            return $totalBookings > 0 ? round(($count / $totalBookings) * 100, 2) : 0;
-        }, $bookingCounts);
+        $approvedBookings = $departments->map(function ($department) {
+            return $department->users->flatMap->booking
+                ->where('status', 'approved')
+                ->count();
+        })->toArray();
 
         return [
             'datasets' => [
                 [
-                    'label' => 'Booking Count',
-                    'data' => $bookingCounts,
-                    'backgroundColor' => $this->getBackgroundColors($facilities->count()),
+                    'label' => 'Total Bookings',
+                    'data' => $totalBookings,
+                    'backgroundColor' => 'rgba(75, 192, 192, 0.6)',
                 ],
                 [
-                    'label' => 'Usage Percentage',
-                    'data' => $usagePercentages,
-                    'type' => 'line',
-                    'borderColor' => 'rgb(255, 99, 132)',
-                    'fill' => false,
+                    'label' => 'Approved Bookings',
+                    'data' => $approvedBookings,
+                    'backgroundColor' => 'rgba(54, 162, 235, 0.6)',
                 ]
             ],
             'labels' => $labels,
@@ -93,18 +93,5 @@ class FacilityUsageWidget extends ChartWidget
             'this_year' => $query->whereYear('booking_start', $now->year),
             default => $query
         };
-    }
-
-    protected function getBackgroundColors(int $count): array
-    {
-        $colors = [
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(54, 162, 235, 0.6)',
-            'rgba(153, 102, 255, 0.6)',
-            'rgba(255, 159, 64, 0.6)',
-            'rgba(255, 99, 132, 0.6)',
-        ];
-
-        return array_slice($colors, 0, $count);
     }
 }

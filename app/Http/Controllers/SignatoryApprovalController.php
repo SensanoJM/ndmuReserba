@@ -9,6 +9,7 @@ use App\Models\Signatory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Services\ReservationService;
+use Filament\Notifications\Notification;
 
 class SignatoryApprovalController extends Controller
 {
@@ -34,16 +35,23 @@ class SignatoryApprovalController extends Controller
         }
     
         $signatory->approve();
+        $booking = $signatory->reservation->booking;
     
-        $reservation = $signatory->reservation;
-        $booking = $reservation->booking;
-        
-        // Check if all signatories have approved and update booking status if necessary
-        $this->reservationService->updateBookingStatusAfterSignatoryApproval($booking);
+        // Notify the booking owner
+        Notification::make()
+            ->title('Signatory Approval')
+            ->body(ucwords(str_replace('_', ' ', $signatory->role)) . ' has approved your booking.')
+            ->icon('heroicon-o-check-circle')
+            ->iconColor('success')
+            ->actions([
+                \Filament\Notifications\Actions\Action::make('view')
+                    ->button()
+                    ->url(route('filament.user.pages.tracking-page', $booking))
+            ])
+            ->sendToDatabase($booking->user);
     
-        // Check if this approval completes all non-director approvals
-        if ($this->allNonDirectorSignatoriesApproved($reservation)) {
-            $this->notifyDirector($reservation);
+        if ($this->allNonDirectorSignatoriesApproved($signatory->reservation)) {
+            $this->notifyDirector($signatory->reservation);
         }
     
         return redirect()->route('approval.success')->with('message', 'Reservation approved successfully.');
@@ -63,7 +71,21 @@ class SignatoryApprovalController extends Controller
         }
     
         $signatory->deny();
+        $booking = $signatory->reservation->booking;
         $signatory->reservation->update(['status' => 'denied']);
+    
+        // Notify the booking owner
+        Notification::make()
+            ->title('Signatory Denial')
+            ->body(ucwords(str_replace('_', ' ', $signatory->role)) . ' has denied your booking.')
+            ->icon('heroicon-o-x-circle')
+            ->iconColor('danger')
+            ->actions([
+                \Filament\Notifications\Actions\Action::make('view')
+                    ->button()
+                    ->url(route('filament.user.pages.tracking-page', $booking))
+            ])
+            ->sendToDatabase($booking->user);
     
         return redirect()->route('approval.success')->with('message', 'Reservation denied successfully.');
     }

@@ -290,46 +290,68 @@ class ReservationTable extends Component implements HasForms, HasTable
 
     public function approveBooking(Booking $booking)
     {
-        $currentStatus = $booking->status;
-
         if ($this->reservationService->approveBooking($booking)) {
-            $booking->status = $currentStatus;
-            
+            // Send notification to the booking owner
             Notification::make()
-                ->title('Booking Approved')
-                ->body('The booking status are now up to date.')
+                ->title('Booking Status Updated')
+                ->body($booking->status === 'prebooking' ? 
+                    'Your booking is now under review by signatories.' : 
+                    'Your booking has been approved.')
+                ->icon($booking->status === 'prebooking' ? 'heroicon-o-clock' : 'heroicon-o-check-circle')
+                ->iconColor($booking->status === 'prebooking' ? 'warning' : 'success')
+                ->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->button()
+                        ->url(route('filament.user.resources.bookings.view', $booking))
+                ])
+                ->sendToDatabase($booking->user);
+
+            // Send success notification to admin
+            Notification::make()
                 ->success()
+                ->title('Booking Approved')
+                ->body('The booking status has been updated successfully.')
                 ->send();
 
             $this->redirectToReservationTable();
         } else {
             Notification::make()
+                ->danger()
                 ->title('Approval Failed')
                 ->body('There was an issue approving the booking.')
-                ->danger()
                 ->send();
         }
     }
 
     public function denyBooking(Booking $booking)
     {
-        $currentStatus = $booking->status;
-
         if ($this->reservationService->denyBooking($booking)) {
-            $booking->status = $currentStatus;
-
+            // Send notification to the booking owner
             Notification::make()
                 ->title('Booking Denied')
-                ->body('The changes will be reflected after the page refreshes.')
+                ->body('Your booking request has been denied.')
+                ->icon('heroicon-o-x-circle')
+                ->iconColor('danger')
+                ->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->button()
+                        ->url(route('filament.user.resources.bookings.view', $booking))
+                ])
+                ->sendToDatabase($booking->user);
+
+            // Send success notification to admin
+            Notification::make()
                 ->warning()
+                ->title('Booking Denied')
+                ->body('The booking has been denied successfully.')
                 ->send();
 
             $this->redirectToReservationTable();
         } else {
             Notification::make()
-                ->title('Denial Failed')
-                ->body('There was an issue denying the booking.')
                 ->danger()
+                ->title('Action Failed')
+                ->body('There was an issue denying the booking.')
                 ->send();
         }
     }

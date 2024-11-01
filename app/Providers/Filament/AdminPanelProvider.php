@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Livewire\BookingStatsOverview;
+use App\Livewire\DepartmentUsageWidget;
 use App\Livewire\FacilityUsageWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -57,6 +58,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 BookingStatsOverview::class,
                 FacilityUsageWidget::class,
+                DepartmentUsageWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

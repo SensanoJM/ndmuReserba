@@ -11,7 +11,7 @@ class ReservationPage extends Page
     protected static ?string $navigationLabel = 'Reservation';
     protected ?string $heading = 'Manage Reservations';
     protected static ?string $navigationGroup = 'Admin';
-    protected static ?string $slug = 'reservation';
+    protected static ?string $slug = 'reservation-page';
 
     protected static string $view = 'filament.pages.reservation-page';
 

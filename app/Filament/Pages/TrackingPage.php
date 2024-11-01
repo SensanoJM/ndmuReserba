@@ -9,7 +9,7 @@ class TrackingPage extends Page
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
     protected static ?string $navigationLabel = 'Track Bookings';
     protected ?string $heading = 'Tracking Your Bookings';
-    protected static ?string $slug = 'track-bookings';
+    protected static ?string $slug = 'tracking-page';
 
     protected static string $view = 'filament.pages.tracking-page';
 }
