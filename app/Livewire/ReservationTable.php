@@ -302,7 +302,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->button()
-                        ->url(route('filament.user.resources.bookings.view', $booking))
+                        ->url(route('filament.user.pages.tracking-page', $booking))
                 ])
                 ->sendToDatabase($booking->user);
 
@@ -335,7 +335,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->button()
-                        ->url(route('filament.user.resources.bookings.view', $booking))
+                        ->url(route('filament.user.pages.tracking-page', $booking))
                 ])
                 ->sendToDatabase($booking->user);
 

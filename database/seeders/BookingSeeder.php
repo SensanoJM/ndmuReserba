@@ -35,6 +35,9 @@ class BookingSeeder extends Seeder
             if ($status === 'approved') {
                 $reservation = $this->createReservation($booking, $status);
                 $this->createSignatories($reservation, $status);
+                
+                // Set pdfNotificationSent to true for approved bookings
+                $booking->update(['pdfNotificationSent' => true]);
             }
         }
     }
@@ -54,6 +57,7 @@ class BookingSeeder extends Seeder
             'status' => $status,
             'user_id' => $users->random()->id,
             'facility_id' => $facility->id,
+            'pdfNotificationSent' => false, // Default to false for new bookings
         ]);
     }
 

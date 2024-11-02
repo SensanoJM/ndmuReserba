@@ -20,6 +20,8 @@ return new class extends Migration
             $table->dateTime('booking_start');  // DateTime to store both date and time
             $table->dateTime('booking_end');    // DateTime to store both date and time
             $table->timestamps();
+
+            $table->boolean('pdfNotificationSent')->default(false);
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

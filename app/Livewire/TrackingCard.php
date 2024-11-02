@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Booking;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Fieldset;
@@ -19,6 +20,8 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class TrackingCard extends Component implements HasForms, HasTable
@@ -68,6 +71,54 @@ class TrackingCard extends Component implements HasForms, HasTable
                         ->requiresConfirmation()
                         ->action(fn(Booking $record) => $this->cancelBooking($record)),
                 ]),
+                    Action::make('pdf')
+                    ->label('Download Form')
+                    ->color('success')
+                    ->icon('heroicon-o-arrow-down-on-square')
+                    ->visible(fn (Booking $record) => $this->isPdfDownloadable($record))
+                    ->action(function (Booking $record) {
+                        try {
+                            // Ensure all required relationships are loaded
+                            $record->load([
+                                'reservation.signatories.user',
+                                'facility',
+                                'user.department',
+                                'equipment'
+                            ]);
+
+                            // Validate required data
+                            if (!$record->reservation || !$record->facility) {
+                                throw new \Exception('Required booking information is missing.');
+                            }
+
+                            return response()->streamDownload(function () use ($record) {
+                                echo Pdf::loadHtml(
+                                    Blade::render('bookings.pdf', [
+                                        'booking' => $record,
+                                        'signatories' => $record->reservation->signatories,
+                                        // Add helper function for safe access
+                                        'getDepartmentName' => function($user) {
+                                            return $user->department->name ?? 'N/A';
+                                        }
+                                    ])
+                                )->stream();
+                            }, "booking-form-{$record->id}.pdf");
+                        } catch (\Exception $e) {
+                            Log::error('PDF Generation Error', [
+                                'booking_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+
+                            Notification::make()
+                                ->title('Error Generating PDF')
+                                ->body('There was an error generating the PDF. Please try again or contact support.')
+                                ->danger()
+                                ->send();
+
+                            return null;
+                        }
+                    }),
+                    
             ])
             ->emptyStateIcon('heroicon-o-bookmark')
             ->emptyStateHeading('No bookings')
@@ -75,6 +126,52 @@ class TrackingCard extends Component implements HasForms, HasTable
             ->poll('10s');
     }
 
+    /**
+     * Determine if the booking PDF is downloadable.
+     *
+     * @param Booking $record
+     * @return bool
+     */
+    private function isPdfDownloadable(Booking $record): bool
+    {
+        try {
+            if (!$record->reservation) {
+                return false;
+            }
+
+            $allApproved = $record->reservation->signatories()
+                ->where('status', '!=', 'approved')
+                ->doesntExist();
+
+            if ($allApproved && !$record->pdfNotificationSent) {
+                // Send notification about PDF availability
+                Notification::make()
+                    ->title('Booking Form Ready')
+                    ->body('All signatories have approved your booking. You can now download the booking form.')
+                    ->icon('heroicon-o-document-text')
+                    ->iconColor('success')
+                    ->actions([
+                        \Filament\Notifications\Actions\Action::make('download')
+                            ->button()
+                            ->label('Download Form')
+                            ->url(route('filament.user.pages.tracking-page', $record))
+                    ])
+                    ->sendToDatabase($record->user);
+
+                // Mark notification as sent
+                $record->update(['pdfNotificationSent' => true]);
+            }
+
+            return $allApproved;
+        } catch (\Exception $e) {
+            Log::error('PDF Downloadable Check Error', [
+                'booking_id' => $record->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+    
     public function bookingInfolist(Booking $record): Infolist
     {
         return Infolist::make()

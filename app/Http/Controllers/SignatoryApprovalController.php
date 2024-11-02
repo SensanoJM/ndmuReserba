@@ -36,6 +36,23 @@ class SignatoryApprovalController extends Controller
     
         $signatory->approve();
         $booking = $signatory->reservation->booking;
+        
+        // Check if all signatories have approved
+        if ($signatory->reservation->allSignatoriesApproved()) {
+            // Update booking and reservation status to 'pending'
+            $booking->update(['status' => 'pending']);
+            $signatory->reservation->update(['status' => 'pending']);
+            
+            // Notify admin about pending final approval
+            Notification::make()
+                ->title('Booking Ready for Final Approval')
+                ->body('All signatories have approved the booking.')
+                ->icon('heroicon-o-check-circle')
+                ->iconColor('success')
+                ->send();
+        } elseif ($this->allNonDirectorSignatoriesApproved($signatory->reservation)) {
+            $this->notifyDirector($signatory->reservation);
+        }
     
         // Notify the booking owner
         Notification::make()
@@ -49,10 +66,6 @@ class SignatoryApprovalController extends Controller
                     ->url(route('filament.user.pages.tracking-page', $booking))
             ])
             ->sendToDatabase($booking->user);
-    
-        if ($this->allNonDirectorSignatoriesApproved($signatory->reservation)) {
-            $this->notifyDirector($signatory->reservation);
-        }
     
         return redirect()->route('approval.success')->with('message', 'Reservation approved successfully.');
     }
@@ -72,6 +85,9 @@ class SignatoryApprovalController extends Controller
     
         $signatory->deny();
         $booking = $signatory->reservation->booking;
+        
+        // Update both booking and reservation status to denied
+        $booking->update(['status' => 'denied']);
         $signatory->reservation->update(['status' => 'denied']);
     
         // Notify the booking owner
@@ -158,7 +174,7 @@ class SignatoryApprovalController extends Controller
             $email = $director->email ?? ($director->user->email ?? null);
             if ($email) {
                 Mail::to($email)->send(new DirectorApprovalRequest($reservation, $director));
-                $reservation->update(['director_notified_at' => now()]); // Mark as notified
+                $reservation->update(['director_notified_at' => now()]);
             }
         }
     }
