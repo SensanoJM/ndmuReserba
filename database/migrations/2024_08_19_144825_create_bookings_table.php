@@ -20,6 +20,7 @@ return new class extends Migration
             $table->dateTime('booking_start');  // DateTime to store both date and time
             $table->dateTime('booking_end');    // DateTime to store both date and time
             $table->timestamps();
+            $table->softDeletes();
 
             $table->boolean('pdfNotificationSent')->default(false);
         

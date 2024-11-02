@@ -12,15 +12,12 @@ use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use IbrahimBougaoua\FilaProgress\Tables\Columns\ProgressBar;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -32,27 +29,70 @@ class TrackingCard extends Component implements HasForms, HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(Booking::where('user_id', Auth::id())->with('reservation.signatories', 'approvers', 'equipment'))
+            ->query(
+                Booking::where('user_id', Auth::id())
+                    ->with('reservation.signatories', 'approvers', 'equipment')
+            )
             ->columns([
-                Split::make([
-                    TextColumn::make('purpose')
-                        ->searchable()
-                        ->weight('medium')
-                        ->limit(30),
-                    Stack::make([
-                        TextColumn::make('PreBooking')
-                            ->placeholder('Pre-booking')
-                            ->alignCenter(),
-                        IconColumn::make('reservation.admin_approval_date')
-                            ->icon(fn($record) => $record->reservation?->admin_approval_date ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-                            ->color(fn($record) => $record->reservation?->admin_approval_date ? 'primary' : 'danger')
-                            ->alignCenter(),
-                    ])->space(1),
-                    $this->createApprovalColumn('Adviser', 'adviser'),
-                    $this->createApprovalColumn('Dean', 'dean'),
-                    $this->createApprovalColumn('President', 'school_president'),
-                    $this->createApprovalColumn('Director', 'school_director'),
-                ])->from('md'),
+                TextColumn::make('purpose')
+                    ->searchable()
+                    ->weight('medium')
+                    ->limit(30),
+                TextColumn::make('status')
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'prebooking' => 'gray',
+                        'in_review' => 'warning',
+                        'pending' => 'warning',
+                        'approved' => 'success',
+                        'denied' => 'danger',
+                        default => 'secondary',
+                    })
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'prebooking' => 'Pre-booking',
+                        'in_review' => 'In Review',
+                        'pending' => 'Pending Final Approval',
+                        'approved' => 'Approved',
+                        'denied' => 'Denied',
+                        default => ucfirst($state),
+                    }),
+                ProgressBar::make('approval_progress')
+                    ->label('Approval Progress')
+                    ->getStateUsing(function ($record) {
+                        // Total steps (Admin + 4 signatories)
+                        $totalSteps = 5;
+                        
+                        if ($record->status === 'approved') {
+                            return [
+                                'total' => $totalSteps,
+                                'progress' => $totalSteps,
+                            ];
+                        }
+                        
+                        if ($record->status === 'denied' || !$record->reservation) {
+                            return [
+                                'total' => $totalSteps,
+                                'progress' => 0,
+                            ];
+                        }
+                        
+                        $completedSteps = 0;
+
+                        // Check admin approval
+                        if ($record->reservation->admin_approval_date) {
+                            $completedSteps++;
+                        }
+
+                        // Count approved signatories
+                        $completedSteps += $record->reservation->signatories
+                            ->where('status', 'approved')
+                            ->count();
+
+                        return [
+                            'total' => $totalSteps,
+                            'progress' => $completedSteps,
+                        ];
+                    })
             ])
             ->actions([
                 ActionGroup::make([
@@ -66,59 +106,38 @@ class TrackingCard extends Component implements HasForms, HasTable
                         ->modalSubmitAction(false)
                         ->modalCancelAction(false),
                     Action::make('cancel')
-                        ->icon('heroicon-s-trash')
                         ->color('danger')
+                        ->icon('heroicon-s-trash')
                         ->requiresConfirmation()
-                        ->action(fn(Booking $record) => $this->cancelBooking($record)),
+                        ->modalDescription('Are you sure you want to cancel this booking? This action cannot be undone.')
+                        ->visible(function (Booking $record): bool {
+                            return $record->status !== 'approved' 
+                                && $record->status !== 'denied' 
+                                && $record->booking_start > now();
+                        })
+                        ->action(function (Booking $record) {
+                            $this->cancelBooking($record);
+                        }),
+                    Action::make('delete')
+                        ->color('danger')
+                        ->icon('heroicon-s-archive-box-x-mark')
+                        ->requiresConfirmation()
+                        ->modalHeading('Delete Approved Booking')
+                        ->modalDescription('Are you sure you want to delete this approved booking from your tracking list? This will only remove it from your view and won\'t affect the actual booking.')
+                        ->modalSubmitActionLabel('Yes, delete from tracking')
+                        ->visible(function (Booking $record): bool {
+                            return $record->status === 'approved';
+                        })
+                        ->action(function (Booking $record) {
+                            $this->deleteFromTracking($record);
+                        }),
                 ]),
-                    Action::make('pdf')
+                Action::make('pdf')
                     ->label('Download Form')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-on-square')
-                    ->visible(fn (Booking $record) => $this->isPdfDownloadable($record))
-                    ->action(function (Booking $record) {
-                        try {
-                            // Ensure all required relationships are loaded
-                            $record->load([
-                                'reservation.signatories.user',
-                                'facility',
-                                'user.department',
-                                'equipment'
-                            ]);
-
-                            // Validate required data
-                            if (!$record->reservation || !$record->facility) {
-                                throw new \Exception('Required booking information is missing.');
-                            }
-
-                            return response()->streamDownload(function () use ($record) {
-                                echo Pdf::loadHtml(
-                                    Blade::render('bookings.pdf', [
-                                        'booking' => $record,
-                                        'signatories' => $record->reservation->signatories,
-                                        // Add helper function for safe access
-                                        'getDepartmentName' => function($user) {
-                                            return $user->department->name ?? 'N/A';
-                                        }
-                                    ])
-                                )->stream();
-                            }, "booking-form-{$record->id}.pdf");
-                        } catch (\Exception $e) {
-                            Log::error('PDF Generation Error', [
-                                'booking_id' => $record->id,
-                                'error' => $e->getMessage()
-                            ]);
-
-                            Notification::make()
-                                ->title('Error Generating PDF')
-                                ->body('There was an error generating the PDF. Please try again or contact support.')
-                                ->danger()
-                                ->send();
-
-                            return null;
-                        }
-                    }),
-                    
+                    ->visible(fn(Booking $record) => $this->isPdfDownloadable($record))
+                    ->action(fn(Booking $record) => $this->downloadPdf($record)),
             ])
             ->emptyStateIcon('heroicon-o-bookmark')
             ->emptyStateHeading('No bookings')
@@ -154,7 +173,7 @@ class TrackingCard extends Component implements HasForms, HasTable
                         \Filament\Notifications\Actions\Action::make('download')
                             ->button()
                             ->label('Download Form')
-                            ->url(route('filament.user.pages.tracking-page', $record))
+                            ->url(route('filament.user.pages.tracking-page', $record)),
                     ])
                     ->sendToDatabase($record->user);
 
@@ -166,12 +185,12 @@ class TrackingCard extends Component implements HasForms, HasTable
         } catch (\Exception $e) {
             Log::error('PDF Downloadable Check Error', [
                 'booking_id' => $record->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             return false;
         }
     }
-    
+
     public function bookingInfolist(Booking $record): Infolist
     {
         return Infolist::make()
@@ -340,44 +359,58 @@ class TrackingCard extends Component implements HasForms, HasTable
         // You can implement this using your notification system
     }
 
-    private function createApprovalColumn($label, $role): Stack
+    protected function canBeDeleted(Booking $record): bool
     {
-        return Stack::make([
-            TextColumn::make($role)
-                ->placeholder($label)
-                ->alignCenter(),
-            IconColumn::make('reservation.signatories')
-                ->label('')
-                ->icon(fn($record) => $this->getSignatoryIcon($record, $role))
-                ->color(fn($record) => $this->getSignatoryColor($record, $role))
-                ->alignCenter(),
-        ]);
+        return $record->status === 'approved';
     }
 
-    private function getSignatoryIcon($record, $role)
+    protected function canBeCancelled(Booking $record): bool
     {
-        $signatory = $record->reservation?->signatories->firstWhere('role', $role);
-        if (!$signatory) {
-            return 'heroicon-o-x-circle';
-        }
-        return match ($signatory->status) {
-            'approved' => 'heroicon-o-check-circle',
-            'denied' => 'heroicon-o-x-circle',
-            default => 'heroicon-o-clock',
-        };
+        // Only allow cancellation of non-approved bookings that haven't started yet
+        return $record->status !== 'approved' &&
+        $record->status !== 'denied' &&
+        $record->booking_start > now();
     }
 
-    private function getSignatoryColor($record, $role)
+    protected function deleteFromTracking(Booking $record): void
     {
-        $signatory = $record->reservation?->signatories->firstWhere('role', $role);
-        if (!$signatory) {
-            return 'danger';
+        try {
+            // Verify the user owns this booking
+            if ($record->user_id !== Auth::id()) {
+                throw new \Exception('Unauthorized action');
+            }
+
+            // Verify the booking can be deleted
+            if (!$this->canBeDeleted($record)) {
+                throw new \Exception('This booking cannot be deleted from tracking');
+            }
+
+            // Soft delete or hide the booking from the user's view
+            // Option 1: Use soft deletes
+            $record->delete();
+
+            // Option 2: Add a hidden_at timestamp (requires adding this column to bookings table)
+            // $record->update(['hidden_at' => now()]);
+
+            Notification::make()
+                ->title('Booking Removed')
+                ->body('The booking has been removed from your tracking list.')
+                ->success()
+                ->send();
+
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('Error')
+                ->body('There was an error removing the booking from tracking.')
+                ->danger()
+                ->send();
+
+            Log::error('Error deleting booking from tracking', [
+                'booking_id' => $record->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
         }
-        return match ($signatory->status) {
-            'approved' => 'primary',
-            'denied' => 'danger',
-            default => 'warning',
-        };
     }
 
     private function formatSignatoryStatus($signatories, $role)
