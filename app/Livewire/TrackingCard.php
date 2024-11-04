@@ -18,6 +18,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use IbrahimBougaoua\FilaProgress\Tables\Columns\ProgressBar;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -31,7 +32,12 @@ class TrackingCard extends Component implements HasForms, HasTable
         return $table
             ->query(
                 Booking::where('user_id', Auth::id())
-                    ->with('reservation.signatories', 'approvers', 'equipment')
+                    ->with(['reservation.signatories', 'approvers'])
+                    ->with(['equipment' => function ($query) {
+                        $query->select('equipment.*')
+                            ->selectRaw('booking_equipment.quantity')
+                            ->withPivot('quantity');
+                    }])
             )
             ->columns([
                 TextColumn::make('purpose')
@@ -61,21 +67,21 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->getStateUsing(function ($record) {
                         // Total steps (Admin + 4 signatories)
                         $totalSteps = 5;
-                        
+
                         if ($record->status === 'approved') {
                             return [
                                 'total' => $totalSteps,
                                 'progress' => $totalSteps,
                             ];
                         }
-                        
+
                         if ($record->status === 'denied' || !$record->reservation) {
                             return [
                                 'total' => $totalSteps,
                                 'progress' => 0,
                             ];
                         }
-                        
+
                         $completedSteps = 0;
 
                         // Check admin approval
@@ -92,7 +98,7 @@ class TrackingCard extends Component implements HasForms, HasTable
                             'total' => $totalSteps,
                             'progress' => $completedSteps,
                         ];
-                    })
+                    }),
             ])
             ->actions([
                 ActionGroup::make([
@@ -111,9 +117,9 @@ class TrackingCard extends Component implements HasForms, HasTable
                         ->requiresConfirmation()
                         ->modalDescription('Are you sure you want to cancel this booking? This action cannot be undone.')
                         ->visible(function (Booking $record): bool {
-                            return $record->status !== 'approved' 
-                                && $record->status !== 'denied' 
-                                && $record->booking_start > now();
+                            return $record->status !== 'approved'
+                            && $record->status !== 'denied'
+                            && $record->booking_start > now();
                         })
                         ->action(function (Booking $record) {
                             $this->cancelBooking($record);
@@ -137,7 +143,49 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-on-square')
                     ->visible(fn(Booking $record) => $this->isPdfDownloadable($record))
-                    ->action(fn(Booking $record) => $this->downloadPdf($record)),
+                    ->action(function (Booking $record) {
+                        try {
+                            // Ensure all required relationships are loaded
+                            $record->load([
+                                'reservation.signatories.user',
+                                'facility',
+                                'user.department',
+                                'equipment',
+                            ]);
+
+                            // Validate required data
+                            if (!$record->reservation || !$record->facility) {
+                                throw new \Exception('Required booking information is missing.');
+                            }
+
+                            return response()->streamDownload(function () use ($record) {
+                                echo Pdf::loadHtml(
+                                    Blade::render('bookings.pdf', [
+                                        'booking' => $record,
+                                        'signatories' => $record->reservation->signatories,
+                                        // Add helper function for safe access
+                                        'getDepartmentName' => function ($user) {
+                                            return $user->department->name ?? 'N/A';
+                                        },
+                                    ])
+                                )->stream();
+                            }, "booking-form-{$record->id}.pdf");
+                        } catch (\Exception $e) {
+                            Log::error('PDF Generation Error', [
+                                'booking_id' => $record->id,
+                                'error' => $e->getMessage(),
+                            ]);
+
+                            Notification::make()
+                                ->title('Error Generating PDF')
+                                ->body('There was an error generating the PDF. Please try again or contact support.')
+                                ->danger()
+                                ->send();
+
+                            return null;
+                        }
+                    }),
+
             ])
             ->emptyStateIcon('heroicon-o-bookmark')
             ->emptyStateHeading('No bookings')
@@ -151,22 +199,26 @@ class TrackingCard extends Component implements HasForms, HasTable
      * @param Booking $record
      * @return bool
      */
-    private function isPdfDownloadable(Booking $record): bool
+    protected function isPdfDownloadable(Booking $record): bool
     {
         try {
-            if (!$record->reservation) {
+            if (!$record->reservation || $record->status !== 'approved') {
                 return false;
             }
 
-            $allApproved = $record->reservation->signatories()
+            $allSignatoriesApproved = $record->reservation->signatories()
                 ->where('status', '!=', 'approved')
                 ->doesntExist();
 
-            if ($allApproved && !$record->pdfNotificationSent) {
-                // Send notification about PDF availability
+            if ($allSignatoriesApproved && $record->status === 'approved' && !$record->pdfNotificationSent) {
+                // Load equipment specific to this booking
+                $record->load(['equipment' => function ($query) use ($record) {
+                    $query->wherePivot('booking_id', $record->id);
+                }]);
+
                 Notification::make()
                     ->title('Booking Form Ready')
-                    ->body('All signatories have approved your booking. You can now download the booking form.')
+                    ->body('Your booking has been fully approved. You can now download the booking form.')
                     ->icon('heroicon-o-document-text')
                     ->iconColor('success')
                     ->actions([
@@ -177,11 +229,10 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ])
                     ->sendToDatabase($record->user);
 
-                // Mark notification as sent
                 $record->update(['pdfNotificationSent' => true]);
             }
 
-            return $allApproved;
+            return $allSignatoriesApproved && $record->status === 'approved';
         } catch (\Exception $e) {
             Log::error('PDF Downloadable Check Error', [
                 'booking_id' => $record->id,
@@ -189,6 +240,12 @@ class TrackingCard extends Component implements HasForms, HasTable
             ]);
             return false;
         }
+    }
+
+    private function formatEquipmentName(string $name): string
+    {
+        // Convert snake_case to title case
+        return ucwords(str_replace('_', ' ', $name));
     }
 
     public function bookingInfolist(Booking $record): Infolist
@@ -281,18 +338,46 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->schema([
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
-                        TextEntry::make('equipment')
+                        TextEntry::make('equipment_list') // Changed from 'equipment' to 'equipment_list'
                             ->label('Equipment')
-                            ->listWithLineBreaks()
-                            ->formatStateUsing(function ($state, Booking $record) {
-                                return $record->equipment->map(function ($equipment) {
-                                    return "{$equipment->name}: {$equipment->pivot->quantity}";
-                                })->join("\n");
+                            ->state(function (Booking $record): string {
+                                if ($record->equipment->isEmpty()) {
+                                    return 'No equipment requested';
+                                }
+
+                                // Group by equipment name and sum quantities
+                                $groupedEquipment = $record->equipment
+                                    ->groupBy('name')
+                                    ->map(function ($group) {
+                                        $totalQuantity = $group->sum('pivot.quantity');
+                                        $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                                        return "{$name} ({$totalQuantity})";
+                                    });
+
+                                return $groupedEquipment->join(', ');
                             })
-                            ->placeholder('No equipment requested'),
+                            ->icon('heroicon-o-cube'),
                     ])
                     ->columns(2),
             ]);
+    }
+
+    protected function formatEquipmentForInfolist($equipment): string
+    {
+        if ($equipment->isEmpty()) {
+            return 'No equipment requested';
+        }
+
+        // Group by equipment name and sum quantities
+        $groupedEquipment = $equipment
+            ->groupBy('name')
+            ->map(function ($group) {
+                $totalQuantity = $group->sum('pivot.quantity');
+                $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                return "{$name} ({$totalQuantity})";
+            });
+
+        return $groupedEquipment->join(', ');
     }
 
     protected function getInfolistSignatoryIcon($signatories, $role): string

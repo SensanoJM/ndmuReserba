@@ -32,8 +32,27 @@ class Booking extends Model
 
     public function equipment()
     {
-        return $this->belongsToMany(Equipment::class, 'booking_equipment')
-                    ->withPivot('quantity');
+        return $this->belongsToMany(Equipment::class)
+                    ->withPivot('quantity')
+                    ->wherePivot('booking_id', $this->id); // Add this line to scope the equipment to this specific booking
+    }
+
+    public function getFormattedEquipmentListAttribute()
+    {
+        // Ensure we're getting equipment only for this booking
+        $bookingEquipment = $this->equipment()
+            ->wherePivot('booking_id', $this->id)
+            ->get();
+
+        if ($bookingEquipment->isEmpty()) {
+            return 'No equipment requested';
+        }
+
+        return $bookingEquipment->map(function ($equipment) {
+            $name = ucwords(str_replace('_', ' ', $equipment->name));
+            $quantity = $equipment->pivot->quantity;
+            return "{$name} ({$quantity} " . ($quantity > 1 ? 'units' : 'unit') . ")";
+        })->join(', ');
     }
 
     public function facility()

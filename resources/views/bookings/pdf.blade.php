@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Form</title>
     <style>
-        /* Reset and base styles */
+        /* Keep existing styles */
         * {
             margin: 0;
             padding: 0;
@@ -19,16 +19,6 @@
             margin: 25px;
         }
 
-        /* Page break utilities */
-        .page-break {
-            page-break-after: always;
-        }
-
-        .avoid-break {
-            page-break-inside: avoid;
-        }
-
-        /* Header styles */
         .header {
             text-align: center;
             margin-bottom: 20px;
@@ -52,7 +42,6 @@
             color: #666;
         }
 
-        /* Section styles */
         .section {
             margin-bottom: 15px;
             padding: 10px;
@@ -67,17 +56,37 @@
             color: #2d3748;
         }
 
-        /* Grid layout */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+        /* Modified grid layout for two-column setup */
+        .info-container {
+            display: flex;
+            gap: 20px;
             margin-bottom: 15px;
         }
 
+        .info-column {
+            flex: 1;
+        }
+
         .info-item {
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-size: 12px;
+        }
+
+        .equipment-list {
+            margin-top: 5px;
+            padding-left: 15px;
+        }
+
+        .equipment-item {
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #4a5568;
+        }
+
+        .no-equipment {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
         }
 
         .label {
@@ -91,31 +100,7 @@
             margin-left: 5px;
         }
 
-        /* Table styles */
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-            font-size: 12px;
-        }
-
-        .table th, .table td {
-            border: 1px solid #ddd;
-            padding: 6px;
-            text-align: left;
-        }
-
-        .table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-            color: #2d3748;
-        }
-
-        .table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        /* Signatures section */
+        /* Keep other existing styles */
         .signatures {
             margin-top: 20px;
             margin-bottom: 30px;
@@ -147,7 +132,6 @@
             color: #666;
         }
 
-        /* Footer */
         .footer {
             position: fixed;
             bottom: 20px;
@@ -159,13 +143,24 @@
             padding: 10px;
         }
 
-        /* Utilities */
-        .text-center { text-align: center; }
-        .font-bold { font-weight: bold; }
-        .text-sm { font-size: 12px; }
-        .text-xs { font-size: 10px; }
-        .mb-2 { margin-bottom: 8px; }
-        .p-2 { padding: 8px; }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .table th, .table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2d3748;
+        }
     </style>
 </head>
 <body>
@@ -190,24 +185,50 @@
         <!-- Main Content -->
         <div class="section avoid-break">
             <div class="section-title">Basic Information</div>
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="label">Requester:</span>
-                    <span class="value">{{ $booking->user->name ?? 'N/A' }}</span>
+            <div class="info-container">
+                <!-- First Column -->
+                <div class="info-column">
+                    <div class="info-item">
+                        <span class="label">Requester:</span>
+                        <span class="value">{{ $booking->user->name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Department:</span>
+                        <span class="value">{{ $getDepartmentName($booking->user) }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Facility:</span>
+                        <span class="value">{{ $booking->facility->facility_name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Purpose:</span>
+                        <span class="value">{{ $booking->purpose ?? 'N/A' }}</span>
+                    </div>
                 </div>
-                <div class="info-item">
-                    <span class="label">Department:</span>
-                    <span class="value">{{ $getDepartmentName($booking->user) }}</span>
+                
+                <!-- Second Column - Equipment -->
+                <div class="info-column">
+                    <div class="info-item">
+                        <span class="label">Equipment:</span>
+                        @php
+                            $bookingEquipment = $booking->equipment()
+                                ->wherePivot('booking_id', $booking->id)
+                                ->get();
+                        @endphp
+                        @if($bookingEquipment->isNotEmpty())
+                            <div class="equipment-list">
+                                @foreach($bookingEquipment->sortBy('name') as $equipment)
+                                    <div class="equipment-item">
+                                        • {{ $equipment->formatted_name }} 
+                                        ({{ $equipment->pivot->quantity }} {{ $equipment->pivot->quantity > 1 ? 'units' : 'unit' }})
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <span class="no-equipment">No equipment requested</span>
+                        @endif
+                    </div>
                 </div>
-                <div class="info-item">
-                    <span class="label">Facility:</span>
-                    <span class="value">{{ $booking->facility->facility_name ?? 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="label">Purpose:</span>
-                    <span class="value">{{ $booking->purpose ?? 'N/A' }}</span>
-                </div>
-            </div>
 
             <div class="section-title">Booking Schedule</div>
             <div class="info-grid">
@@ -230,28 +251,6 @@
             </div>
         </div>
 
-        @if($booking->equipment && $booking->equipment->isNotEmpty())
-        <div class="section avoid-break">
-            <div class="section-title">Equipment Requirements</div>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th width="70%">Equipment</th>
-                        <th width="30%">Quantity</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($booking->equipment as $equipment)
-                    <tr>
-                        <td>{{ $equipment->name ?? 'N/A' }}</td>
-                        <td>{{ $equipment->pivot->quantity ?? 'N/A' }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        @endif
-
         <div class="section avoid-break">
             <div class="section-title">Approval Status</div>
             <table class="table">
@@ -267,7 +266,7 @@
                     <tr>
                         <td>{{ ucwords(str_replace('_', ' ', $signatory->role ?? 'N/A')) }}</td>
                         <td>{{ ucfirst($signatory->status ?? 'N/A') }}</td>
-                        <td class="text-sm">{{ optional($signatory->approval_date)->format('M d, Y h:i A') ?? 'N/A' }}</td>
+                        <td>{{ optional($signatory->approval_date)->format('M d, Y h:i A') ?? 'N/A' }}</td>
                     </tr>
                     @endforeach
                 </tbody>

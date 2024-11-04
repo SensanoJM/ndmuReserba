@@ -2,14 +2,13 @@
 
 namespace App\Mail;
 
+use App\Models\Reservation;
+use App\Models\Signatory;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use App\Models\Reservation;
-use App\Models\Signatory;
 use Illuminate\Support\Str;
 
 class DirectorApprovalRequest extends Mailable
@@ -45,36 +44,42 @@ class DirectorApprovalRequest extends Mailable
      *
      * @return $this
      */
-    
-    public function build()
-    {
-        return $this->view('emails.director-approval-request')
-                    ->subject('Final Approval Request for Reservation')
-                    ->with([
-                        'approvalUrl' => $this->approvalUrl,
-                        'denialUrl' => $this->denialUrl,
-                        'previousApprovals' => $this->previousApprovals
-                    ]);
-    }
+
+     public function build()
+     {
+         return $this->view('emails.director-approval-request')
+                     ->subject('Final Approval Request for Reservation')
+                     ->with([
+                         'approvalUrl' => $this->approvalUrl,
+                         'denialUrl' => $this->denialUrl,
+                         'previousApprovals' => $this->previousApprovals,
+                         'formattedEquipment' => $this->formatEquipment()
+                     ]);
+     }
 
     /**
      * Gets the list of previous approvals of the given reservation.
-     * 
+     *
      * @return \Illuminate\Support\Collection|array
      */
     private function getPreviousApprovals()
     {
         return $this->reservation->signatories()
-                    ->where('role', '!=', 'school_director')
-                    ->where('status', 'approved')
-                    ->get()
-                    ->map(function ($signatory) {
-                        return [
-                            'name' => $signatory->user->name,
-                            'role' => $signatory->role,
-                            'approval_date' => $signatory->approval_date,
-                        ];
-                    });
+            ->where('role', '!=', 'school_director')
+            ->where('status', 'approved')
+            ->get()
+            ->map(function ($signatory) {
+                // Get name from either user relationship, email, or role as fallback
+                $name = $signatory->user?->name 
+                    ?? $signatory->email 
+                    ?? ucwords(str_replace('_', ' ', $signatory->role));
+
+                return [
+                    'name' => $name,
+                    'role' => ucwords(str_replace('_', ' ', $signatory->role)),
+                    'approval_date' => $signatory->approval_date,
+                ];
+            });
     }
 
     /**
@@ -102,24 +107,23 @@ class DirectorApprovalRequest extends Mailable
     }
 
     protected function formatEquipment(): string
-{
-    $equipment = $this->reservation->booking->equipment;
-    if (empty($equipment)) {
-        return 'No equipment requested';
+    {
+        $booking = $this->reservation->booking;
+        if (!$booking || !$booking->equipment) {
+            return 'No equipment requested';
+        }
+    
+        // Group by equipment name and sum quantities
+        $groupedEquipment = $booking->equipment
+            ->groupBy('name')
+            ->map(function ($group) {
+                $totalQuantity = $group->sum('pivot.quantity');
+                $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                return "{$name}: {$totalQuantity} " . ($totalQuantity > 1 ? 'pieces' : 'piece');
+            });
+    
+        return $groupedEquipment->join(' • ');
     }
-
-    if (is_string($equipment)) {
-        return $equipment;
-    }
-
-    if (is_array($equipment)) {
-        return collect($equipment)->map(function ($quantity, $name) {
-            return "$name: $quantity";
-        })->join(', ');
-    }
-
-    return 'Equipment data format is invalid';
-}
 
     /**
      * Get the attachments for the message.

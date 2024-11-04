@@ -29,6 +29,17 @@ class User extends Authenticatable implements MustVerifyEmail
         
     ];
 
+        // Add a method to help with debugging
+        public function getRoleDetails(): array
+        {
+            return [
+                'user_id' => $this->id,
+                'role' => $this->role,
+                'is_admin_check' => $this->isAdmin(),
+                'raw_role_comparison' => $this->role === 'admin',
+            ];
+        }
+
     public function isAdmin()
     {
         return $this->role === 'admin';

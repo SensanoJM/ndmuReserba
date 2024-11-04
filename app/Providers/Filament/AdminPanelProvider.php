@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\PreventAdminAccess;
 use App\Livewire\BookingStatsOverview;
 use App\Livewire\DepartmentUsageWidget;
 use App\Livewire\FacilityUsageWidget;
@@ -70,9 +72,11 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                EnsureUserIsAdmin::class, // New middleware
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsureUserIsAdmin::class, // New middleware
             ]);
     }
 }

@@ -50,6 +50,7 @@ class SignatoryApprovalRequest extends Mailable
                     ->with([
                         'approvalUrl' => $this->approvalUrl,
                         'denialUrl' => $this->denialUrl,
+                        'formattedEquipment' => $this->formatEquipment()
                     ]);
     }
 
@@ -77,24 +78,23 @@ class SignatoryApprovalRequest extends Mailable
     }
 
     protected function formatEquipment(): string
-{
-    $equipment = $this->reservation->booking->equipment;
-    if (empty($equipment)) {
-        return 'No equipment requested';
+    {
+        $booking = $this->reservation->booking;
+        if (!$booking || !$booking->equipment) {
+            return 'No equipment requested';
+        }
+    
+        // Group by equipment name and sum quantities
+        $groupedEquipment = $booking->equipment
+            ->groupBy('name')
+            ->map(function ($group) {
+                $totalQuantity = $group->sum('pivot.quantity');
+                $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                return "{$name}: {$totalQuantity} " . ($totalQuantity > 1 ? 'pieces' : 'piece');
+            });
+    
+        return $groupedEquipment->join(' • ');
     }
-
-    if (is_string($equipment)) {
-        return $equipment;
-    }
-
-    if (is_array($equipment)) {
-        return collect($equipment)->map(function ($quantity, $name) {
-            return "$name: $quantity";
-        })->join(', ');
-    }
-
-    return 'Equipment data format is invalid';
-}
 
     /**
      * Get the attachments for the message.

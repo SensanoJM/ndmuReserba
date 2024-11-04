@@ -305,11 +305,26 @@ class UserCalendarWidget extends FullCalendarWidget
     public function eventDidMount(): string
     {
         return <<<JS
-        function({ event, timeText, isStart, isEnd, isMirror, isPast, isFuture, isToday, el, view }){
+        function({ event, timeText, isStart, isEnd, isMirror, isPast, isFuture, isToday, el, view }) {
+            const startTime = new Date(event.start).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+            const endTime = new Date(event.end).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+            
+            const tooltipContent = 
+                "📝 " + event.title + "  " +
+                "🕒 " + startTime + " - " + endTime + "  " +
+                "🏢 " + event.extendedProps.facility + "  " +
+                "👤 " + event.extendedProps.user;
+            
             el.setAttribute("x-tooltip", "tooltip");
-            el.setAttribute("x-data", "{ tooltip: '"+event.title+"' }");
+            el.setAttribute("x-data", "{ tooltip: " + JSON.stringify(tooltipContent) + " }");
         }
-    JS;
+        JS;
     }
 
     private function refreshEvents(): void

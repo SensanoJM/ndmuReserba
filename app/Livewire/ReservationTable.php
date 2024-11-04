@@ -15,11 +15,9 @@ use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Livewire\Component;
-use Illuminate\Support\Facades\Log;
-use Filament\Tables\Columns\BadgeColumn;
 
 class ReservationTable extends Component implements HasForms, HasTable
 {
@@ -27,7 +25,7 @@ class ReservationTable extends Component implements HasForms, HasTable
     use InteractsWithForms;
 
     protected $reservationService;
-    
+
     public function boot(ReservationService $reservationService)
     {
         $this->reservationService = $reservationService;
@@ -41,7 +39,7 @@ class ReservationTable extends Component implements HasForms, HasTable
             ->columns($this->getTableColumns())
             ->actions($this->getTableActions())
             ->striped()
-            ->defaultSort('created_at', 'desc') 
+            ->defaultSort('created_at', 'desc')
             ->persistSortInSession()
             ->poll('5s')
             ->emptyStateHeading('No reservations found')
@@ -57,35 +55,35 @@ class ReservationTable extends Component implements HasForms, HasTable
     protected function getTableColumns(): array
     {
         return [
-        TextColumn::make('user.name')
-            ->label('Requester')
-            ->searchable()
-            ->sortable()
-            ->toggleable(),
-        TextColumn::make('purpose')
-            ->limit(30)
-            ->searchable()
-            ->sortable()
-            ->toggleable(),
-        TextColumn::make('facility.facility_name')
-            ->label('Facility')
-            ->searchable()
-            ->sortable()
-            ->toggleable(),
-        TextColumn::make('created_at')
-            ->label('Request Date')
-            ->dateTime()
-            ->sortable()
-            ->visible(fn(): bool => true)
-            ->toggleable(),
-        TextColumn::make('booking_start')
-            ->label('Booking Start')
-            ->dateTime()
-            ->sortable()
-            ->toggleable(),
+            TextColumn::make('user.name')
+                ->label('Requester')
+                ->searchable()
+                ->sortable()
+                ->toggleable(),
+            TextColumn::make('purpose')
+                ->limit(30)
+                ->searchable()
+                ->sortable()
+                ->toggleable(),
+            TextColumn::make('facility.facility_name')
+                ->label('Facility')
+                ->searchable()
+                ->sortable()
+                ->toggleable(),
+            TextColumn::make('created_at')
+                ->label('Request Date')
+                ->dateTime()
+                ->sortable()
+                ->visible(fn(): bool => true)
+                ->toggleable(),
+            TextColumn::make('booking_start')
+                ->label('Booking Start')
+                ->dateTime()
+                ->sortable()
+                ->toggleable(),
             TextColumn::make('status')
                 ->badge()
-                ->color(fn (Booking $record): string => match ($record->status) {
+                ->color(fn(Booking $record): string => match ($record->status) {
                     'prebooking' => 'gray',
                     'in_review' => 'warning',
                     'pending' => 'warning',
@@ -114,7 +112,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                 Action::make('view')
                     ->icon('heroicon-s-eye')
                     ->color('gray')
-                    ->modalContent(fn (Booking $record) => $this->bookingInfolist($record))
+                    ->modalContent(fn(Booking $record) => $this->bookingInfolist($record))
                     ->modalSubmitAction(false)
                     ->modalCancelAction(false),
                 Action::make('approve')
@@ -150,6 +148,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                         TextEntry::make('purpose'),
                         TextEntry::make('participants'),
                     ])->columns(2),
+
                 Fieldset::make('Approval Status')
                     ->schema([
                         TextEntry::make('status')
@@ -165,7 +164,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                                 return $this->getPreBookingApprovalStatus($record)['color'];
                             })
                             ->placeholder('Pending'),
-                            TextEntry::make('reservation.signatories')
+                        TextEntry::make('reservation.signatories')
                             ->label('Adviser Approval')
                             ->formatStateUsing(fn($state, Booking $record) => $this->formatSignatoryStatus($record->reservation, 'adviser'))
                             ->icon(fn($state, Booking $record) => $this->getSignatoryIcon($record->reservation, 'adviser'))
@@ -192,8 +191,53 @@ class ReservationTable extends Component implements HasForms, HasTable
                     ])
                     ->hidden(fn(Booking $record) => $record->status === 'approved')
                     ->columns(2),
+
+                Fieldset::make('Additional Information')
+                    ->schema([
+                        TextEntry::make('participants')
+                            ->icon('heroicon-o-user-group'),
+                            TextEntry::make('equipment_list') // Changed from 'equipment' to 'equipment_list'
+                            ->label('Equipment')
+                            ->state(function (Booking $record): string {
+                                if ($record->equipment->isEmpty()) {
+                                    return 'No equipment requested';
+                                }
+                        
+                                // Group by equipment name and sum quantities
+                                $groupedEquipment = $record->equipment
+                                    ->groupBy('name')
+                                    ->map(function ($group) {
+                                        $totalQuantity = $group->sum('pivot.quantity');
+                                        $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                                        return "{$name} ({$totalQuantity})";
+                                    });
+                        
+                                return $groupedEquipment->join(', ');
+                            })
+                            ->icon('heroicon-o-cube'),
+                    ])
+                    ->columns(2),
             ]);
     }
+
+    protected function formatEquipmentForInfolist($equipment): string
+    {
+        if ($equipment->isEmpty()) {
+            return 'No equipment requested';
+        }
+    
+        // Group by equipment name and sum quantities
+        $groupedEquipment = $equipment
+            ->groupBy('name')
+            ->map(function ($group) {
+                $totalQuantity = $group->sum('pivot.quantity');
+                $name = ucwords(str_replace('_', ' ', $group->first()->name));
+                return "• {$name}: {$totalQuantity} " . ($totalQuantity > 1 ? 'pieces' : 'piece');
+            });
+    
+        return $groupedEquipment->join("\n");
+    }
+    
 
     protected function getTableFilters(): array
     {
@@ -208,7 +252,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ])
                 ->label('Status')
                 ->placeholder('All Statuses')
-                ->multiple()
+                ->multiple(),
         ];
     }
 
@@ -294,15 +338,15 @@ class ReservationTable extends Component implements HasForms, HasTable
             // Send notification to the booking owner
             Notification::make()
                 ->title('Booking Status Updated')
-                ->body($booking->status === 'prebooking' ? 
-                    'Your booking is now under review by signatories.' : 
+                ->body($booking->status === 'prebooking' ?
+                    'Your booking is now under review by signatories.' :
                     'Your booking has been approved.')
                 ->icon($booking->status === 'prebooking' ? 'heroicon-o-clock' : 'heroicon-o-check-circle')
                 ->iconColor($booking->status === 'prebooking' ? 'warning' : 'success')
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->button()
-                        ->url(route('filament.user.pages.tracking-page', $booking))
+                        ->url(route('filament.user.pages.tracking-page', $booking)),
                 ])
                 ->sendToDatabase($booking->user);
 
@@ -335,7 +379,7 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->button()
-                        ->url(route('filament.user.pages.tracking-page', $booking))
+                        ->url(route('filament.user.pages.tracking-page', $booking)),
                 ])
                 ->sendToDatabase($booking->user);
 

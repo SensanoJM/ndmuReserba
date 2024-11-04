@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\BookingPage;
 use App\Filament\Pages\TrackingPage;
+use App\Http\Middleware\PreventAdminAccess;
 use App\Livewire\UserCalendarWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Navigation\NavigationItem;
@@ -40,6 +41,7 @@ class UserPanelProvider extends PanelProvider
                 BookingPage::class,
                 TrackingPage::class,
             ])
+            ->databaseNotifications()
             ->plugin(
                 FilamentFullCalendarPlugin::make()
                     ->timezone('UTC')  // Adjust to your timezone
@@ -56,9 +58,11 @@ class UserPanelProvider extends PanelProvider
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
                 SubstituteBindings::class,
+                PreventAdminAccess::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
+                PreventAdminAccess::class,
             ]);
     }
 }

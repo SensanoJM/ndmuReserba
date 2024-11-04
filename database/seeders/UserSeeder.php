@@ -17,7 +17,7 @@ class UserSeeder extends Seeder
         // Invoke other seeders here
         $this->call([
             DepartmentSeeder::class, // Seeds departments
-            EquipmentSeeder::class, // Seeds equipment
+            // EquipmentSeeder::class, // Seeds equipment
             FacilitySeeder::class, // Seeds facilities
         ]);
 

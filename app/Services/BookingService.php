@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Approver;
 use App\Models\Booking;
+use App\Models\Equipment;
 use App\Models\Facility;
 use Illuminate\Support\Facades\DB;
 
@@ -13,11 +14,36 @@ class BookingService
     {
         return DB::transaction(function () use ($data, $facility, $userId) {
             $booking = $this->createBookingRecord($data, $facility, $userId);
-            $this->createEquipmentEntries($booking, $data['equipment']);
+            $this->processEquipment($booking, $data['equipment']);
             $this->createApprovers($booking, $data);
 
             return $booking;
         });
+    }
+
+    private function processEquipment(Booking $booking, array $equipmentData)
+    {
+        if (empty($equipmentData)) {
+            return;
+        }
+
+        foreach ($equipmentData as $item) {
+            if (empty($item['item']) || empty($item['quantity'])) {
+                continue;
+            }
+
+            // Find or create equipment (normalized name)
+            $equipmentName = strtolower(trim($item['item']));
+            $equipment = Equipment::firstOrCreate(
+                ['name' => $equipmentName],
+                
+            );
+
+            // Attach equipment with quantity
+            $booking->equipment()->attach($equipment->id, [
+                'quantity' => $item['quantity']
+            ]);
+        }
     }
 
     private function createBookingRecord(array $data, Facility $facility, int $userId): Booking

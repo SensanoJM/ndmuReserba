@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Booking;
 use App\Models\User;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 class BookingObserver
 {
@@ -52,36 +53,49 @@ class BookingObserver
                 default => 'primary'
             };
 
-            // For regular users - direct to user tracking page
-            Notification::make()
+            // Create base notification
+            $notification = Notification::make()
                 ->title($title)
                 ->body("Your booking for {$booking->facility->facility_name} has been {$booking->status}.")
                 ->icon($icon)
-                ->iconColor($color)
+                ->iconColor($color);
+
+            // Set URL based on user role with panel path check
+            if ($booking->user->role === 'admin') {
+                Log::info('Setting admin notification URL');
+                $notification->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->button()
+                        ->url(route('filament.admin.pages.tracking-page', $booking))
+                ]);
+            } else {
+                Log::info('Setting user notification URL');
+                $notification->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->button()
+                        ->url(route('filament.user.pages.tracking-page', $booking))
+                ]);
+            }
+
+            $notification->sendToDatabase($booking->user);
+        }
+    }
+
+    private function notifyAdmins(Booking $booking)
+    {
+        $adminUsers = User::where('role', 'admin')->get();
+        foreach ($adminUsers as $admin) {
+            Notification::make()
+                ->title('Booking Needs Review')
+                ->body("A booking for {$booking->facility->facility_name} requires review.")
+                ->icon('heroicon-o-clock')
+                ->iconColor('warning')
                 ->actions([
                     \Filament\Notifications\Actions\Action::make('view')
                         ->button()
-                        ->url(route('filament.user.pages.tracking-page')) // User tracking page
+                        ->url(route('filament.admin.pages.reservation-page'))
                 ])
-                ->sendToDatabase($booking->user);
-
-            // If the status changes to in_review, also notify admins
-            if ($booking->status === 'in_review') {
-                $adminUsers = User::where('role', 'admin')->get();
-                foreach ($adminUsers as $admin) {
-                    Notification::make()
-                        ->title('Booking Needs Review')
-                        ->body("A booking for {$booking->facility->facility_name} requires review.")
-                        ->icon('heroicon-o-clock')
-                        ->iconColor('warning')
-                        ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
-                                ->button()
-                                ->url(route('filament.admin.pages.reservation-page')) // Admin reservation page
-                        ])
-                        ->sendToDatabase($admin);
-                }
-            }
+                ->sendToDatabase($admin);
         }
     }
 }

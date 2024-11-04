@@ -70,8 +70,14 @@
                 </tr>
                 @if(isset($formattedEquipment) && $formattedEquipment !== 'No equipment requested')
                 <tr>
-                    <th>Equipment:</th>
-                    <td>{{ $formattedEquipment }}</td>
+                    <th style="text-align: left; padding-right: 10px;">Equipment:</th>
+                    <td>
+                        <ul style="list-style-type: disc; margin: 0; padding-left: 20px;">
+                            @foreach(explode(' • ', $formattedEquipment) as $equipment)
+                                <li style="margin-bottom: 5px;">{{ $equipment }}</li>
+                            @endforeach
+                        </ul>
+                    </td>
                 </tr>
                 @endif
             </table>
