@@ -146,24 +146,31 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->minValue(1),
                 ]),
 
-            Section::make('Equipment')
-                ->description('Specify any equipment needed for your booking.')
+                Section::make('Equipment')
+                ->description('Specify any equipment needed for your booking. Leave empty if no equipment is needed.')
                 ->schema([
                     Repeater::make('equipment')
                         ->schema([
                             Select::make('item')
                                 ->label('Equipment')
-                                ->options($this->equipmentOptions),
+                                ->options($this->equipmentOptions)
+                                ->nullable(),
                             TextInput::make('quantity')
                                 ->label('Quantity')
                                 ->numeric()
-                                ->minValue(1),
+                                ->minValue(1)
+                                ->nullable()
+                                ->required(fn (Get $get): bool => filled($get('item'))),
                         ])
                         ->columns(2)
-                        ->defaultItems(1)
+                        ->defaultItems(0)
                         ->addActionLabel('Add Equipment')
                         ->collapsible()
-                        ->itemLabel(fn(array $state): ?string => $state['item'] ?? null),
+                        ->collapsed()
+                        ->itemLabel(fn(array $state): ?string => $state['item'] ?? 'No equipment selected')
+                        ->deletable(true)
+                        ->reorderable(true)
+                        ->nullable(),
                 ]),
 
             Section::make('Approval Contacts')
@@ -414,7 +421,15 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         try {
             DB::transaction(function () use ($facility) {
                 $booking = $this->createBookingRecord($facility);
-                $this->processBookingRelations($booking);
+                
+                // Only process equipment if it exists and is not empty
+                if (!empty($this->data['equipment'])) {
+                    $this->processBookingRelations($booking);
+                } else {
+                    // Just create approvers if no equipment
+                    $this->createApprovers($booking);
+                }
+                
                 $this->notifySuccess();
             });
 
@@ -448,8 +463,8 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                 'booking_start' => ['required', 'date', 'after_or_equal:' . now()->toDateTimeString()],
                 'booking_end' => ['required', 'date', 'after:booking_start'],
                 'equipment' => ['nullable', 'array'],
-                'equipment.*.item' => ['required_with:equipment.*.quantity', 'string'],
-                'equipment.*.quantity' => ['required_with:equipment.*.item', 'integer', 'min:1'],
+                'equipment.*.item' => ['nullable', 'string'],
+                'equipment.*.quantity' => ['nullable', 'integer', 'min:1', 'required_with:equipment.*.item'],
                 'adviser_email' => ['required', 'email'],
                 'dean_email' => ['required', 'email'],
             ]

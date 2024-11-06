@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Booking extends Model
@@ -16,14 +16,25 @@ class Booking extends Model
 
     protected $fillable = [
         'user_id', 'facility_id', 'booking_start', 'booking_end', // Updated to booking_start and booking_end
-        'purpose', 'duration', 'participants', 'status',
+        'purpose', 'duration', 'participants', 'status', 'updateNotificationSent',
     ];
 
     protected $casts = [
         'booking_start' => 'datetime', // Updated to datetime for DateTimePicker
-        'booking_end'   => 'datetime', // Updated to datetime for DateTimePicker
-        'participants'  => 'integer',
+        'booking_end' => 'datetime', // Updated to datetime for DateTimePicker
+        'participants' => 'integer',
+        'updateNotificationSent' => 'boolean',
     ];
+
+    public function markUpdateNotified(): void
+    {
+        $this->update(['updateNotificationSent' => true]);
+    }
+
+    public function resetUpdateNotification(): void
+    {
+        $this->update(['updateNotificationSent' => false]);
+    }
 
     public function approvers()
     {
@@ -33,8 +44,8 @@ class Booking extends Model
     public function equipment()
     {
         return $this->belongsToMany(Equipment::class)
-                    ->withPivot('quantity')
-                    ->wherePivot('booking_id', $this->id); // Add this line to scope the equipment to this specific booking
+            ->withPivot('quantity')
+            ->wherePivot('booking_id', $this->id); // Add this line to scope the equipment to this specific booking
     }
 
     public function getFormattedEquipmentListAttribute()
@@ -128,7 +139,7 @@ class Booking extends Model
             'facility',
             'reservation.signatories',
             'equipment',
-            'approvers'
+            'approvers',
         ]);
     }
 }

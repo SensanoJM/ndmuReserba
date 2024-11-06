@@ -23,6 +23,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->boolean('pdfNotificationSent')->default(false);
+            $table->boolean('updateNotificationSent')->default(false);
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

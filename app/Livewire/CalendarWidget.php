@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Booking;
 use App\Models\Facility;
+use App\Models\User;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
@@ -79,7 +80,7 @@ class CalendarWidget extends FullCalendarWidget
                             ->send();
                         return;
                     }
-                    
+
                     $this->checkAvailability();
                     $this->updateDuration($get, $set);
                 }),
@@ -163,25 +164,57 @@ class CalendarWidget extends FullCalendarWidget
     {
         return [
             Actions\EditAction::make()
-                ->mountUsing(
-                    function (Booking $record, Form $form, array $arguments) {
-                        $form->fill([
-                            'facility_id' => $record->facility_id,
-                            'purpose' => $record->purpose,
-                            'booking_start' => $arguments['event']['start'] ?? $record->booking_start,
-                            'booking_end' => $arguments['event']['end'] ?? $record->booking_end,
-                            'participants' => $record->participants,
-                        ]);
+            ->mountUsing(function (Booking $record, Form $form, array $arguments) {
+                $form->fill([
+                    'facility_id' => $record->facility_id,
+                    'purpose' => $record->purpose,
+                    'booking_start' => $arguments['event']['start'] ?? $record->booking_start,
+                    'booking_end' => $arguments['event']['end'] ?? $record->booking_end,
+                    'participants' => $record->participants,
+                ]);
+            })
+            ->action(function (Booking $record, array $data): void {
+                // Store old dates for comparison
+                $oldStart = $record->booking_start;
+                $oldEnd = $record->booking_end;
+                
+                // Update the booking
+                $record->update($data);
+                
+                // Check if dates were changed
+                if ($oldStart != $data['booking_start'] || $oldEnd != $data['booking_end']) {
+                    // Load the user relationship if not loaded
+                    $record->load(['user', 'facility']);
+                    
+                    // Send notification to the booking requester
+                    if ($record->user) {
+                        $formattedStart = Carbon::parse($data['booking_start'])->format('M d, Y h:i A');
+                        $formattedEnd = Carbon::parse($data['booking_end'])->format('M d, Y h:i A');
+                        
+                        Notification::make()
+                            ->title('Booking Schedule Changed')
+                            ->body("Your booking for {$record->facility->facility_name} has been rescheduled to:\n{$formattedStart} - {$formattedEnd}")
+                            ->icon('heroicon-o-calendar')
+                            ->iconColor('info')
+                            ->actions([
+                                \Filament\Notifications\Actions\Action::make('view')
+                                    ->button()
+                                    ->label('View Details')
+                                    ->url(route('filament.user.pages.tracking-page'))
+                            ])
+                            ->sendToDatabase($record->user);
                     }
-                )
-                ->action(function (Booking $record, array $data): void {
-                    $record->update($data);
-                    $this->refreshEvents();
-                    Notification::make()
-                        ->title('Booking updated successfully')
-                        ->success()
-                        ->send();
-                }),
+                }
+                
+                $this->refreshEvents();
+                
+                // Show success notification in UI for admin
+                Notification::make()
+                    ->title('Success')
+                    ->body('Booking has been updated successfully.')
+                    ->success()
+                    ->send();
+            }),
             Actions\DeleteAction::make()
                 ->action(function (Booking $record): void {
                     $record->delete();
@@ -225,23 +258,68 @@ class CalendarWidget extends FullCalendarWidget
         ];
     }
 
+    protected function calculateDuration(Carbon $start, Carbon $end): string
+    {
+        $totalMinutes = $start->diffInMinutes($end);
+        $hours = floor($totalMinutes / 60);
+        $minutes = $totalMinutes % 60;
+
+        $durationParts = [];
+
+        if ($hours > 0) {
+            $durationParts[] = "{$hours} " . ($hours === 1 ? 'hour' : 'hours');
+        }
+
+        if ($minutes > 0) {
+            $durationParts[] = "{$minutes} " . ($minutes === 1 ? 'minute' : 'minutes');
+        }
+
+        return implode(' ', $durationParts);
+    }
+
     /**
-     * Updates a booking with new start and end dates after a user has dropped it in the calendar.
+     * Update a booking event by dragging and dropping it to a new position in the calendar.
      *
-     * @param int $eventId The ID of the booking that was moved.
-     * @param string $newStart The new start date of the booking.
-     * @param string $newEnd The new end date of the booking.
+     * @param int $eventId The ID of the booking event that was dragged and dropped.
+     * @param string $newStart The new start date and time of the booking event in ISO 8601 format.
+     * @param string $newEnd The new end date and time of the booking event in ISO 8601 format.
      */
     public function eventDrop($eventId, $newStart, $newEnd): void
     {
-        $booking = Booking::findOrFail($eventId);
+        // Eager load the booking with its relationships
+        $booking = Booking::with(['user', 'facility'])->findOrFail($eventId);
+        
+        // Update the booking
         $booking->update([
             'booking_start' => $newStart,
             'booking_end' => $newEnd,
         ]);
+    
+        // Notify the booking requester
+        if ($booking->user) {
+            $formattedStart = Carbon::parse($newStart)->format('M d, Y h:i A');
+            $formattedEnd = Carbon::parse($newEnd)->format('M d, Y h:i A');
+            
+            Notification::make()
+                ->title('Booking Schedule Changed')
+                ->body("Your booking for {$booking->facility->facility_name} has been rescheduled to:\n{$formattedStart} - {$formattedEnd}")
+                ->icon('heroicon-o-calendar')
+                ->iconColor('info')
+                ->actions([
+                    \Filament\Notifications\Actions\Action::make('view')
+                        ->button()
+                        ->label('View Details')
+                        ->url(route('filament.user.pages.tracking-page'))
+                ])
+                ->sendToDatabase($booking->user);
+        }
+    
         $this->refreshEvents();
+        
+        // Show immediate success notification in UI for admin
         Notification::make()
-            ->title('Booking updated successfully')
+            ->title('Success')
+            ->body('Booking schedule has been updated successfully.')
             ->success()
             ->send();
     }
