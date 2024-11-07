@@ -16,6 +16,9 @@ return new class extends Migration
             $table->foreignId('equipment_id')->constrained()->onDelete('cascade');
             $table->integer('quantity')->default(1);
             $table->primary(['booking_id', 'equipment_id']);
+
+            $table->index(['booking_id', 'equipment_id']);
+            $table->index('equipment_id');
         });
     }
 

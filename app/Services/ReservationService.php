@@ -12,6 +12,16 @@ use Illuminate\Support\Facades\DB;
 
 class ReservationService
 {
+    /**
+     * Approves a booking by updating its status and associated reservation status.
+     *
+     * This method performs a database transaction to ensure data consistency.
+     * If the booking status is 'prebooking', it triggers the initial approval process.
+     * If the booking status is 'pending' and all signatories have approved, it triggers the final approval process.
+     *
+     * @param Booking $booking The booking instance to be approved.
+     * @return bool True if the booking was successfully approved, false otherwise.
+     */
     public function approveBooking(Booking $booking)
     {
         return DB::transaction(function () use ($booking) {

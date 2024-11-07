@@ -394,17 +394,9 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         $this->isAvailable = ($conflictingBookings === 0);
 
         if ($this->isAvailable) {
-            Notification::make()
-                ->title('Time Slot Available')
-                ->body('The selected time slot is available.')
-                ->success()
-                ->send();
+            $this->notifySuccess('Time Slot Available', 'The selected time slot is available.');
         } else {
-            Notification::make()
-                ->title('Time Slot Unavailable')
-                ->body('The selected time slot is not available. Please choose a different time.')
-                ->danger()
-                ->send();
+            $this->notifyError('Time Slot Unavailable', 'The selected time slot is not available. Please choose a different time.');
         }
     }
 
@@ -419,23 +411,30 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         }
 
         try {
-            DB::transaction(function () use ($facility) {
-                $booking = $this->createBookingRecord($facility);
-                
-                // Only process equipment if it exists and is not empty
-                if (!empty($this->data['equipment'])) {
-                    $this->processBookingRelations($booking);
-                } else {
-                    // Just create approvers if no equipment
-                    $this->createApprovers($booking);
-                }
-                
-                $this->notifySuccess();
-            });
-
+            $booking = $this->bookingService->createBooking(
+                $this->validatedData,
+                $facility,
+                Auth::id()
+            );
+            
+            $this->notifySuccess(
+                'Booking Created',
+                'Your booking has been created and is pending approval. You can track its status in the tracking page.'
+            );
+            
+            event(new BookingCreatedEvent($booking));
             $this->dispatch('bookingCreated');
+            
         } catch (\Exception $e) {
-            $this->handleBookingError($e);
+            $this->notifyError(
+                'Booking Creation Failed',
+                'There was an error creating your booking. Please try again later.'
+            );
+            
+            Log::error('Booking creation error:', [
+                'error' => $e->getMessage(),
+                'data' => $this->validatedData
+            ]);
         }
     }
 
@@ -486,6 +485,12 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         return true;
     }
 
+    /**
+     * Create a new booking record in the database.
+     *
+     * @param  \App\Models\Facility  $facility
+     * @return \App\Models\Booking
+     */
     protected function createBookingRecord(Facility $facility): Booking
     {
         return $this->bookingService->createBooking(
@@ -493,63 +498,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
             $facility,
             Auth::id()
         );
-    }
-
-    protected function processBookingRelations(Booking $booking): void
-    {
-        $this->processEquipment($booking);
-        $this->createApprovers($booking);
-
-        event(new BookingCreatedEvent($booking));
-    }
-
-    protected function processEquipment(Booking $booking): void
-    {
-        if (empty($this->validatedData['equipment'])) {
-            return;
-        }
-
-        // Group equipment by item and sum quantities
-        $groupedEquipment = collect($this->validatedData['equipment'])
-            ->filter(fn($item) => !empty($item['item']) && !empty($item['quantity']))
-            ->groupBy('item')
-            ->map(function ($items) {
-                return [
-                    'item' => $items->first()['item'],
-                    'quantity' => $items->sum('quantity'),
-                ];
-            });
-
-        foreach ($groupedEquipment as $equipmentData) {
-            $equipment = Equipment::firstOrCreate(['name' => $equipmentData['item']]);
-
-            // Check if the equipment is already attached
-            if ($booking->equipment()->where('equipment_id', $equipment->id)->exists()) {
-                // Update the existing quantity
-                $booking->equipment()->updateExistingPivot($equipment->id, [
-                    'quantity' => $equipmentData['quantity'],
-                ]);
-            } else {
-                // Attach new equipment
-                $booking->equipment()->attach($equipment->id, [
-                    'quantity' => $equipmentData['quantity'],
-                ]);
-            }
-        }
-    }
-
-    protected function createApprovers(Booking $booking): void
-    {
-        $booking->approvers()->createMany([
-            [
-                'email' => $this->validatedData['adviser_email'],
-                'role' => 'adviser',
-            ],
-            [
-                'email' => $this->validatedData['dean_email'],
-                'role' => 'dean',
-            ],
-        ]);
     }
 
     protected function showValidationErrors(array $errors): void
@@ -563,22 +511,27 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         }
     }
 
-    protected function notifySuccess(): void
+    protected function notifySuccess(string $title, string $message = null): void
     {
         Notification::make()
-            ->title('Booking Successfully Created')
-            ->body('Your booking has been created and is pending approval. You can track its status in the tracking page.')
+            ->title($title)
             ->success()
+            ->icon('heroicon-o-check-circle')
+            ->body($message)
             ->duration(5000)
             ->send();
     }
 
-    protected function notifyError(string $title, string $message): void
+    /**
+     * Display an error notification with custom title and message
+     */
+    protected function notifyError(string $title, string $message = null): void
     {
         Notification::make()
             ->title($title)
-            ->body($message)
             ->danger()
+            ->icon('heroicon-o-x-circle')
+            ->body($message)
             ->duration(5000)
             ->send();
     }
@@ -597,15 +550,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         Log::error('Booking creation error: ' . $e->getMessage());
     }
 
-    protected function notifyInvalidBookingDate()
-    {
-        Notification::make()
-            ->title('Invalid Booking Date')
-            ->body('You cannot book a date before today.')
-            ->danger()
-            ->send();
-    }
-
     protected function handleValidationErrors($exception)
     {
         foreach ($exception->errors() as $field => $errors) {
@@ -617,48 +561,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                     ->send();
             }
         }
-    }
-
-    protected function notifyAvailability()
-    {
-        $notification = Notification::make()
-            ->title($this->isAvailable ? 'Time Slot Available' : 'Time Slot Unavailable')
-            ->body($this->isAvailable ? 'The selected time slot is available.' : 'The selected time slot is not available. Please choose a different time.')
-            ->icon($this->isAvailable ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-            ->iconColor($this->isAvailable ? 'success' : 'danger');
-
-        $notification->send();
-    }
-
-    protected function notifyUnavailableTimeSlot()
-    {
-        Notification::make()
-            ->title('The selected time slot is not available.')
-            ->icon('heroicon-o-x-circle')
-            ->iconColor('danger')
-            ->send();
-    }
-
-    protected function notifyBookingSuccess()
-    {
-        Notification::make()
-            ->title('Booking created successfully!')
-            ->icon('heroicon-o-check-circle')
-            ->iconColor('success')
-            ->body('Please wait for Signatory approval. You can Track your booking anytime.')
-            ->send();
-    }
-
-    protected function notifyBookingError(\Exception $e)
-    {
-        Notification::make()
-            ->title('Error creating booking')
-            ->icon('heroicon-o-x-circle')
-            ->iconColor('danger')
-            ->body('An error occurred while creating your booking. Please try again later.')
-            ->send();
-
-        \Illuminate\Support\Facades\Log::error('Booking creation error: ' . $e->getMessage());
     }
 
     public function render()

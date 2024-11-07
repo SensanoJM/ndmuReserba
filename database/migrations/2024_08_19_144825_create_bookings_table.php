@@ -24,6 +24,7 @@ return new class extends Migration
 
             $table->boolean('pdfNotificationSent')->default(false);
             $table->boolean('updateNotificationSent')->default(false);
+            $table->index(['facility_id', 'booking_start', 'booking_end']);
         
             // Foreign key constraints
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

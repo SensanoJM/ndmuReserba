@@ -205,17 +205,19 @@ class TrackingCard extends Component implements HasForms, HasTable
             if (!$record->reservation || $record->status !== 'approved') {
                 return false;
             }
-
+    
             $allSignatoriesApproved = $record->reservation->signatories()
                 ->where('status', '!=', 'approved')
                 ->doesntExist();
-
-            if ($allSignatoriesApproved && $record->status === 'approved' && !$record->pdfNotificationSent) {
-                // Load equipment specific to this booking
-                $record->load(['equipment' => function ($query) use ($record) {
-                    $query->wherePivot('booking_id', $record->id);
-                }]);
-
+    
+            // Only send notification if all conditions are met and notification hasn't been sent yet
+            if ($allSignatoriesApproved && 
+                $record->status === 'approved' && 
+                !$record->pdfNotificationSent) {
+                
+                // Ensure relationships are loaded
+                $record->load(['equipment']);
+    
                 Notification::make()
                     ->title('Booking Form Ready')
                     ->body('Your booking has been fully approved. You can now download the booking form.')
@@ -228,10 +230,11 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->url(route('filament.user.pages.tracking-page', $record)),
                     ])
                     ->sendToDatabase($record->user);
-
+    
+                // Mark notification as sent
                 $record->update(['pdfNotificationSent' => true]);
             }
-
+    
             return $allSignatoriesApproved && $record->status === 'approved';
         } catch (\Exception $e) {
             Log::error('PDF Downloadable Check Error', [

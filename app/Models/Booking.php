@@ -15,8 +15,15 @@ class Booking extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'user_id', 'facility_id', 'booking_start', 'booking_end', // Updated to booking_start and booking_end
-        'purpose', 'duration', 'participants', 'status', 'updateNotificationSent',
+        'user_id', 'facility_id',
+        'booking_start',
+        'booking_end',
+        'purpose',
+        'duration',
+        'participants',
+        'status',
+        'updateNotificationSent',
+        'pdfNotificationSent',
     ];
 
     protected $casts = [
@@ -24,6 +31,7 @@ class Booking extends Model
         'booking_end' => 'datetime', // Updated to datetime for DateTimePicker
         'participants' => 'integer',
         'updateNotificationSent' => 'boolean',
+        'pdfNotificationSent' => 'boolean',
     ];
 
     public function markUpdateNotified(): void
