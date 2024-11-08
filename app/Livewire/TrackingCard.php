@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Booking;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Fieldset;
@@ -260,7 +261,7 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->schema([
                         TextEntry::make('reservation.admin_approval_date')
                             ->label('Pre-booking Approval')
-                            ->date()
+                            ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A') : null)
                             ->icon(fn($state) => $state ? 'heroicon-o-check-circle' : 'heroicon-o-clock')
                             ->iconColor(fn($state) => $state ? 'success' : 'warning')
                             ->color(fn($state) => $state ? 'success' : 'warning')
@@ -325,14 +326,16 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ])
                     ->columns(3),
 
-                Fieldset::make('Date & Time')
+                    Fieldset::make('Date & Time')
                     ->schema([
                         TextEntry::make('booking_start')
                             ->label('Start Date')
+                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
                             ->iconColor('primary')
                             ->icon('heroicon-o-calendar'),
                         TextEntry::make('booking_end')
                             ->label('End Date')
+                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
                             ->iconColor('warning')
                             ->icon('heroicon-o-calendar'),
                     ]),
@@ -506,14 +509,15 @@ class TrackingCard extends Component implements HasForms, HasTable
         if (!$signatories instanceof \Illuminate\Support\Collection) {
             return 'No Signatories';
         }
-
+    
         $signatory = $signatories->firstWhere('role', $role);
         if (!$signatory) {
             return 'No Signatory';
         }
+        
         return match ($signatory->status) {
-            'approved' => 'Approved on ' . $signatory->approval_date->format('Y-m-d H:i'),
-            'denied' => 'Denied on ' . $signatory->approval_date->format('Y-m-d H:i'),
+            'approved' => 'Approved on ' . $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'denied' => 'Denied on ' . $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
             default => 'Pending',
         };
     }

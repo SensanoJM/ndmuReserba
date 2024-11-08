@@ -54,7 +54,10 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
     public $isSlideOverOpen = false;
     public $selectedFacility = null;
     public $isAvailable = true;
-    protected array $validatedData = []; // Add this property
+    
+    protected array $validatedData = [];
+    protected $facilityRepository;
+    protected $bookingService;
 
     public ?array $data = [];
 
@@ -68,9 +71,6 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
         'pole' => 'Pole',
         'rostrum' => 'Rostrum',
     ];
-
-    protected $facilityRepository;
-    protected $bookingService;
 
     public function boot(FacilityRepository $facilityRepository, BookingService $bookingService)
     {

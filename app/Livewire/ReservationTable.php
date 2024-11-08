@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Booking;
 use App\Services\ReservationService;
+use Carbon\Carbon;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Infolists\Components\Fieldset;
@@ -72,13 +73,17 @@ class ReservationTable extends Component implements HasForms, HasTable
                 ->toggleable(),
             TextColumn::make('created_at')
                 ->label('Request Date')
-                ->dateTime()
+                ->formatStateUsing(fn ($state) => Carbon::parse($state)
+                    ->setTimezone('Asia/Manila')
+                    ->format('M d, Y h:i A'))
                 ->sortable()
                 ->visible(fn(): bool => true)
                 ->toggleable(),
             TextColumn::make('booking_start')
                 ->label('Booking Start')
-                ->dateTime()
+                ->formatStateUsing(fn ($state) => Carbon::parse($state)
+                    ->setTimezone('Asia/Manila')
+                    ->format('M d, Y h:i A'))
                 ->sortable()
                 ->toggleable(),
             TextColumn::make('status')
@@ -134,22 +139,39 @@ class ReservationTable extends Component implements HasForms, HasTable
         ];
     }
 
-    public function bookingInfolist(Booking $booking): Infolist
+    public function bookingInfolist(Booking $record): Infolist
     {
-        return Infolist::make()
-            ->record($booking)
+            // Ensure relationships are loaded
+            $record->load(['reservation.signatories', 'facility', 'user']);
+
+            return Infolist::make()
+            ->record($record)
             ->schema([
                 Fieldset::make('Booking Details')
                     ->schema([
-                        TextEntry::make('user.name')->label('User'),
-                        TextEntry::make('facility.facility_name')->label('Facility'),
-                        TextEntry::make('booking_start')->label('Start Time'),
-                        TextEntry::make('booking_end')->label('End Time'),
-                        TextEntry::make('purpose'),
-                        TextEntry::make('participants'),
+                        TextEntry::make('user.name')
+                            ->icon('heroicon-o-user')
+                            ->label('User'),
+                        TextEntry::make('facility.facility_name')
+                            ->label('Facility')
+                            ->icon('heroicon-o-building-office'),
+                        TextEntry::make('booking_start')
+                            ->label('Start Date')
+                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
+                            ->iconColor('primary')
+                            ->icon('heroicon-o-calendar'),
+                    TextEntry::make('booking_end')
+                            ->label('End Date')
+                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
+                            ->iconColor('warning')
+                            ->icon('heroicon-o-calendar'),
+                        TextEntry::make('purpose')
+                            ->icon('heroicon-o-pencil'),
+                        TextEntry::make('participants')
+                            ->icon('heroicon-o-user-group'),
                     ])->columns(2),
 
-                Fieldset::make('Approval Status')
+                Fieldset::make('Approval Progress')
                     ->schema([
                         TextEntry::make('status')
                             ->label('Pre-booking Approval')
@@ -166,28 +188,24 @@ class ReservationTable extends Component implements HasForms, HasTable
                             ->placeholder('Pending'),
                         TextEntry::make('reservation.signatories')
                             ->label('Adviser Approval')
-                            ->formatStateUsing(fn($state, Booking $record) => $this->formatSignatoryStatus($record->reservation, 'adviser'))
-                            ->icon(fn($state, Booking $record) => $this->getSignatoryIcon($record->reservation, 'adviser'))
-                            ->iconColor(fn($state, Booking $record) => $this->getSignatoryColor($record->reservation, 'adviser'))
-                            ->placeholder('Pending'),
+                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'adviser'))
+                            ->icon(fn($state, $record) => $this->getSignatoryIcon($record->reservation->signatories, 'adviser'))
+                            ->iconColor(fn($state, $record) => $this->getSignatoryColor($record->reservation->signatories, 'adviser')),
                         TextEntry::make('reservation.signatories')
                             ->label('Dean Approval')
-                            ->formatStateUsing(fn($state, Booking $record) => $this->formatSignatoryStatus($record->reservation, 'dean'))
-                            ->icon(fn($state, Booking $record) => $this->getSignatoryIcon($record->reservation, 'dean'))
-                            ->iconColor(fn($state, Booking $record) => $this->getSignatoryColor($record->reservation, 'dean'))
-                            ->placeholder('Pending'),
+                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'dean'))
+                            ->icon(fn($state, $record) => $this->getSignatoryIcon($record->reservation->signatories, 'dean'))
+                            ->iconColor(fn($state, $record) => $this->getSignatoryColor($record->reservation->signatories, 'dean')),
                         TextEntry::make('reservation.signatories')
                             ->label('School President Approval')
-                            ->formatStateUsing(fn($state, Booking $record) => $this->formatSignatoryStatus($record->reservation, 'school_president'))
-                            ->icon(fn($state, Booking $record) => $this->getSignatoryIcon($record->reservation, 'school_president'))
-                            ->iconColor(fn($state, Booking $record) => $this->getSignatoryColor($record->reservation, 'school_president'))
-                            ->placeholder('Pending'),
+                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_president'))
+                            ->icon(fn($state, $record) => $this->getSignatoryIcon($record->reservation->signatories, 'school_president'))
+                            ->iconColor(fn($state, $record) => $this->getSignatoryColor($record->reservation->signatories, 'school_president')),
                         TextEntry::make('reservation.signatories')
                             ->label('School Director Approval')
-                            ->formatStateUsing(fn($state, Booking $record) => $this->formatSignatoryStatus($record->reservation, 'school_director'))
-                            ->icon(fn($state, Booking $record) => $this->getSignatoryIcon($record->reservation, 'school_director'))
-                            ->iconColor(fn($state, Booking $record) => $this->getSignatoryColor($record->reservation, 'school_director'))
-                            ->placeholder('Pending'),
+                            ->formatStateUsing(fn($state, $record) => $this->formatSignatoryStatus($record->reservation->signatories, 'school_director'))
+                            ->icon(fn($state, $record) => $this->getSignatoryIcon($record->reservation->signatories, 'school_director'))
+                            ->iconColor(fn($state, $record) => $this->getSignatoryColor($record->reservation->signatories, 'school_director')),
                     ])
                     ->hidden(fn(Booking $record) => $record->status === 'approved')
                     ->columns(2),
@@ -275,46 +293,56 @@ class ReservationTable extends Component implements HasForms, HasTable
         ];
     }
 
-    private function formatSignatoryStatus($reservation, $role): string
+    private function formatSignatoryStatus($signatories, $role)
     {
-        if (!$reservation) {
+        // Check if signatories exist
+        if (!$signatories) {
             return 'Pending';
         }
-
-        $signatory = $reservation->signatories->firstWhere('role', $role);
+    
+        $signatory = $signatories->firstWhere('role', $role);
         if (!$signatory) {
             return 'Pending';
         }
-
+    
         return match ($signatory->status) {
-            'approved' => 'Approved on ' . $signatory->approval_date->format('Y-m-d H:i'),
-            'denied' => 'Denied on ' . $signatory->approval_date->format('Y-m-d H:i'),
+            'approved' => 'Approved on ' . Carbon::parse($signatory->approval_date)->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'denied' => 'Denied on ' . Carbon::parse($signatory->approval_date)->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
             default => 'Pending',
         };
     }
 
-    private function getSignatoryIcon($reservation, $role): string
+    protected function getSignatoryIcon($signatories, $role): string
     {
-        if (!$reservation) {
+        if (!$signatories) {
             return 'heroicon-o-clock';
         }
-
-        $signatory = $reservation->signatories->firstWhere('role', $role);
-        return match ($signatory?->status) {
+    
+        $signatory = $signatories->firstWhere('role', $role);
+        if (!$signatory) {
+            return 'heroicon-o-clock';
+        }
+    
+        return match ($signatory->status) {
             'approved' => 'heroicon-o-check-circle',
             'denied' => 'heroicon-o-x-circle',
             default => 'heroicon-o-clock',
         };
     }
+    
 
-    private function getSignatoryColor($reservation, $role): string
+    protected function getSignatoryColor($signatories, $role): string
     {
-        if (!$reservation) {
+        if (!$signatories) {
             return 'warning';
         }
-
-        $signatory = $reservation->signatories->firstWhere('role', $role);
-        return match ($signatory?->status) {
+    
+        $signatory = $signatories->firstWhere('role', $role);
+        if (!$signatory) {
+            return 'warning';
+        }
+    
+        return match ($signatory->status) {
             'approved' => 'success',
             'denied' => 'danger',
             default => 'warning',
