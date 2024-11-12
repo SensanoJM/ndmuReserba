@@ -13,6 +13,7 @@ use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Session;
 use Saade\FilamentFullCalendar\Actions;
 use Saade\FilamentFullCalendar\Widgets\FullCalendarWidget;
 
@@ -21,14 +22,36 @@ class CalendarWidget extends FullCalendarWidget
     public Model|string|null $model = Booking::class;
 
     public $isAvailable = true;
+    public ?int $facilityFilter = null;
+
+    public function boot()
+    {
+        // Get facility filter from session
+        $this->facilityFilter = Session::get('calendar_facility_filter');
+    }
+
+    // Optional: Add a listener for filter changes
+    protected $listeners = ['calendar-filter-changed' => 'handleFilterChange'];
+
+    public function handleFilterChange($facilityId)
+    {
+        $this->facilityFilter = $facilityId;
+        $this->refreshEvents();
+    }
 
     public function fetchEvents(array $fetchInfo): array
     {
-        return Booking::query()
+        $query = Booking::query()
             ->with('user', 'facility')
             ->where('status', 'approved')
-            ->whereBetween('booking_start', [$fetchInfo['start'], $fetchInfo['end']])
-            ->get()
+            ->whereBetween('booking_start', [$fetchInfo['start'], $fetchInfo['end']]);
+
+        // Apply facility filter if set
+        if ($this->facilityFilter) {
+            $query->where('facility_id', $this->facilityFilter);
+        }
+
+        return $query->get()
             ->map(function (Booking $booking) {
                 return [
                     'id' => $booking->id,
@@ -242,7 +265,7 @@ class CalendarWidget extends FullCalendarWidget
             ],
             'initialView' => 'dayGridMonth',
             'editable' => true,
-            'selectable' => true, // https://github.com/saade/filament-fullcalendar?tab=readme-ov-file#creating-events-on-day-selection
+            'selectable' => false,
             'dayMaxEvents' => true,
             'eventDurationEditable' => true,
             'eventDrop' => 'function(info) {

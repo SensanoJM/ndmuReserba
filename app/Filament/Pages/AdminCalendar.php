@@ -7,6 +7,7 @@ use App\Models\Facility;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Computed;
 
 class AdminCalendar extends Page
@@ -23,7 +24,13 @@ class AdminCalendar extends Page
 
     public function mount(): void
     {
-        $this->form->fill();
+        // Restore filter from session if it exists
+        $savedFilter = Session::get('calendar_facility_filter');
+        if ($savedFilter) {
+            $this->data['facility_id'] = $savedFilter;
+        }
+        
+        $this->form->fill($this->data);
     }
 
     public function form(Form $form): Form
@@ -35,38 +42,20 @@ class AdminCalendar extends Page
                     ->options(Facility::pluck('facility_name', 'id'))
                     ->placeholder('All Facilities')
                     ->searchable()
-                    ->live(),
-                Select::make('user_role')
-                    ->label('Filter by User Role')
-                    ->options([
-                        'student' => 'Student',
-                        'faculty' => 'Faculty',
-                        'organization' => 'Organization',
-                    ])
-                    ->placeholder('All Roles')
-                    ->live(),
+                    ->live()
+                    ->afterStateUpdated(function ($state) {
+                        // Save filter to session
+                        Session::put('calendar_facility_filter', $state);
+                        $this->dispatch('calendar-filter-changed', facilityId: $state)->to('calendar-widget');
+                        $this->redirect(static::getUrl());
+                    }),
             ])
-            ->columns(2)
             ->statePath('data');
     }
-
-    
 
     #[Computed]
     public function calendarWidget(): CalendarWidget
     {
-        $widget = new CalendarWidget();
-
-        if ($this->data['facility_id'] ?? null) {
-            $widget->modifyQueryUsing(fn($query) => $query->where('facility_id', $this->data['facility_id']));
-        }
-
-        if ($this->data['user_role'] ?? null) {
-            $widget->modifyQueryUsing(fn($query) => $query->whereHas('user', function ($subQuery) {
-                $subQuery->where('role', $this->data['user_role']);
-            }));
-        }
-
-        return $widget;
+        return new CalendarWidget();
     }
 }

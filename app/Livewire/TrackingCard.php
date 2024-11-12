@@ -516,8 +516,8 @@ class TrackingCard extends Component implements HasForms, HasTable
         }
         
         return match ($signatory->status) {
-            'approved' => 'Approved on ' . $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
-            'denied' => 'Denied on ' . $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'approved' => $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
+            'denied' => $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
             default => 'Pending',
         };
     }
