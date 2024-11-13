@@ -12,6 +12,4 @@ class BookingPage extends Page
     protected static ?string $slug = 'booking';
 
     protected static string $view = 'filament.pages.booking-page';
-
-
 }
