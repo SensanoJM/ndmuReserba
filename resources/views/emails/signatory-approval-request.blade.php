@@ -84,7 +84,7 @@
         </div>
 
         <div style="text-align: center;">
-            <p>To approve this request, please click the button below to review and provide your digital signature:</p>
+            <p>To approve this request, please click the button below:</p>
             <a href="{{ $approvalUrl }}" class="button approve">Approve</a>
             
             <p>If you need to deny this request, click here:</p>

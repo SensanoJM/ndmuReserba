@@ -148,7 +148,7 @@
             width: 40%;
         }
 
-        /* Requirements section */
+        /* Equipment section */
         .equipment-section {
             margin: 15px 0;
         }
@@ -158,17 +158,12 @@
             font-weight: bold;
             margin-bottom: 5px;
             float: left;
-            width: 200px;
-        }
-
-        .equipment-list {
-            margin-left: 210px;
         }
 
         .equipment-item {
+            margin-left: 210px;
             border-bottom: 1px dotted #000;
             padding: 2px 0;
-            margin-bottom: 5px;
             font-size: 10pt;
         }
 
@@ -298,61 +293,63 @@
         }
 
         .footer {
-        clear: both;
-        margin-top: 20px;
-        font-size: 8pt;
-        position: relative;
-    }
+            clear: both;
+            margin-top: 20px;
+            font-size: 8pt;
+            position: relative;
+        }
 
-    .copy-section {
-        display: block;
-        margin-bottom: 5px;
-    }
+        .copy-section {
+            display: block;
+            margin-bottom: 5px;
+        }
 
-    .checkbox {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border: 1px solid #000;
-        margin: 0 5px;
-    }
+        .checkbox {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border: 1px solid #000;
+            margin: 0 5px;
+        }
 
-    .copy-label {
-        display: inline-block;
-        margin-right: 15px;
-    }
+        .copy-label {
+            display: inline-block;
+            margin-right: 15px;
+        }
 
-    .copy-item {
-        display: inline-block;
-        margin-right: 30px; /* Spacing between items */
-    }
+        .copy-item {
+            display: inline-block;
+            margin-right: 30px;
+            /* Spacing between items */
+        }
 
-    .form-number {
-        position: absolute;
-        right: 0;
-        top: 0;
-        color: #666;
-    }
+        .form-number {
+            position: absolute;
+            right: 0;
+            top: 0;
+            color: #666;
+        }
 
-    .end-footer {
-        position: fixed;
-        bottom: 20px;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 10px;
-        color: #666;
-        width: 100%;
-    }
+        .end-footer {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            width: 100%;
+        }
 
-    .text-xs {
-        margin-bottom: 3px;
-    }
+        .text-xs {
+            margin-bottom: 3px;
+        }
 
-    /* Add padding to main content to prevent overlap */
-    body {
-        margin-bottom: 100px; /* Space for fixed footer */
-    }
+        /* Add padding to main content to prevent overlap */
+        body {
+            margin-bottom: 100px;
+            /* Space for fixed footer */
+        }
 
         /* Clearfix for float layouts */
         .clearfix:after {
@@ -453,18 +450,17 @@
     <!-- Equipment Section HTML -->
     <div class="equipment-section">
         <div class="equipment-label">Facilities Requested:</div>
-        <div class="equipment-list">
             @if ($booking->equipment && $booking->equipment->count() > 0)
-                @foreach ($booking->equipment as $equipment)
-                    <div class="equipment-item">
-                        {{ ucwords(str_replace('_', ' ', $equipment->name)) }}
-                        ({{ $equipment->pivot->quantity }} {{ $equipment->pivot->quantity > 1 ? 'units' : 'unit' }})
-                    </div>
-                @endforeach
+                <div class="equipment-item">
+                    {{ $booking->equipment->map(function($equipment) {
+                        return ucwords(str_replace('_', ' ', $equipment->name)) . 
+                            ' (' . $equipment->pivot->quantity . ' ' . 
+                            ($equipment->pivot->quantity > 1 ? 'units' : 'unit') . ')';
+                    })->join(', ') }}
+                </div>
             @else
                 <div class="no-equipment">No equipment requested</div>
             @endif
-        </div>
     </div>
 
     <!-- Section Divider -->

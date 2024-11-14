@@ -49,8 +49,17 @@ class ReservationTable extends Component implements HasForms, HasTable
 
     protected function getTableQuery()
     {
-        return Booking::withAllRelations()->latest()->tap(function ($query) {
-        });
+        return Booking::query()
+            ->with([
+                'user',
+                'facility',
+                'reservation.signatories',
+                'equipment' => function ($query) {
+                    $query->select('equipment.*')
+                        ->selectRaw('booking_equipment.quantity');
+                }
+            ])
+            ->latest();
     }
 
     protected function getTableColumns(): array
@@ -139,13 +148,10 @@ class ReservationTable extends Component implements HasForms, HasTable
         ];
     }
 
-    public function bookingInfolist(Booking $record): Infolist
+    public function bookingInfolist(Booking $booking): Infolist
     {
-            // Ensure relationships are loaded
-            $record->load(['reservation.signatories', 'facility', 'user']);
-
             return Infolist::make()
-            ->record($record)
+            ->record($booking->load(['equipment']))
             ->schema([
                 Fieldset::make('Booking Details')
                     ->schema([
@@ -214,25 +220,10 @@ class ReservationTable extends Component implements HasForms, HasTable
                     ->schema([
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
-                            TextEntry::make('equipment_list') // Changed from 'equipment' to 'equipment_list'
+                        TextEntry::make('formatted_equipment_list')
                             ->label('Equipment')
-                            ->state(function (Booking $record): string {
-                                if ($record->equipment->isEmpty()) {
-                                    return 'No equipment requested';
-                                }
-                        
-                                // Group by equipment name and sum quantities
-                                $groupedEquipment = $record->equipment
-                                    ->groupBy('name')
-                                    ->map(function ($group) {
-                                        $totalQuantity = $group->sum('pivot.quantity');
-                                        $name = ucwords(str_replace('_', ' ', $group->first()->name));
-                                        return "{$name} ({$totalQuantity})";
-                                    });
-                        
-                                return $groupedEquipment->join(', ');
-                            })
-                            ->icon('heroicon-o-cube'),
+                            ->icon('heroicon-o-cube')
+                            ->html()
                     ])
                     ->columns(2),
             ]);

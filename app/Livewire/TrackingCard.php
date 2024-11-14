@@ -33,12 +33,14 @@ class TrackingCard extends Component implements HasForms, HasTable
         return $table
             ->query(
                 Booking::where('user_id', Auth::id())
-                    ->with(['reservation.signatories', 'approvers'])
-                    ->with(['equipment' => function ($query) {
+                ->with([
+                    'reservation.signatories', 
+                    'approvers',
+                    'equipment' => function ($query) {
                         $query->select('equipment.*')
-                            ->selectRaw('booking_equipment.quantity')
-                            ->withPivot('quantity');
-                    }])
+                            ->selectRaw('booking_equipment.quantity');
+                    }
+                ])
             )
             ->columns([
                 TextColumn::make('purpose')
@@ -344,24 +346,8 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->schema([
                         TextEntry::make('participants')
                             ->icon('heroicon-o-user-group'),
-                        TextEntry::make('equipment_list') // Changed from 'equipment' to 'equipment_list'
+                        TextEntry::make('formatted_equipment_list')
                             ->label('Equipment')
-                            ->state(function (Booking $record): string {
-                                if ($record->equipment->isEmpty()) {
-                                    return 'No equipment requested';
-                                }
-
-                                // Group by equipment name and sum quantities
-                                $groupedEquipment = $record->equipment
-                                    ->groupBy('name')
-                                    ->map(function ($group) {
-                                        $totalQuantity = $group->sum('pivot.quantity');
-                                        $name = ucwords(str_replace('_', ' ', $group->first()->name));
-                                        return "{$name} ({$totalQuantity})";
-                                    });
-
-                                return $groupedEquipment->join(', ');
-                            })
                             ->icon('heroicon-o-cube'),
                     ])
                     ->columns(2),

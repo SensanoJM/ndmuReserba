@@ -24,8 +24,8 @@ class Equipment extends Model
 
     public function bookings()
     {
-        return $this->belongsToMany(Booking::class)
-                    ->withPivot('quantity');
+        return $this->belongsToMany(Booking::class, 'booking_equipment')
+            ->withPivot('quantity');
     }
 
     /**
