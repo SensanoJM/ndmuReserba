@@ -15,7 +15,8 @@ class Booking extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'user_id', 'facility_id',
+        'user_id',
+        'facility_id',
         'booking_start',
         'booking_end',
         'purpose',

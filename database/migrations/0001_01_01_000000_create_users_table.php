@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->string('id_number')->unique()->nullable();
             $table->unsignedBigInteger('department_id')->nullable()->constrained()->nullOnDelete();
-            $table->text('description')->nullable(); // For organization description
+            $table->text('description')->nullable();
             $table->string('role')->default('student');
             $table->string('position')->nullable();
             $table->id()->unique();

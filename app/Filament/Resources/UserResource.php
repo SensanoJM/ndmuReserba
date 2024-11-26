@@ -57,9 +57,7 @@ class UserResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true)
-                    ->hidden(fn(Forms\Get $get) => $get('role') === 'organization')
-                    ->hidden(fn(Forms\Get $get) => $get('role') === 'signatory')
-                    ->hidden(fn(Forms\Get $get) => $get('role') === 'admin'),
+                    ->visible(fn (Forms\Get $get) => !in_array($get('role'), ['signatory', 'organization', 'admin'])),
     
                 Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name')

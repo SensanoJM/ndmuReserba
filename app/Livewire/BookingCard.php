@@ -254,6 +254,7 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                     ->form(fn(Facility $record) => $this->getFormSchema($record))
                     ->action(function (array $data, Facility $record): void {
                         $this->data = $data;
+                        $this->checkAvailability();
                         $this->submitBooking($record);
                     })
                     ->extraAttributes(['class' => 'w-full justify-center']),

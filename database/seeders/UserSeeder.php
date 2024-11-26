@@ -21,7 +21,7 @@ class UserSeeder extends Seeder
             FacilitySeeder::class, // Seeds facilities
         ]);
 
-        // Seed Users
+        // Admin CREDENTIALS
         User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
@@ -34,6 +34,7 @@ class UserSeeder extends Seeder
             'department_id' => null, 
         ]);
 
+        //USER CREDENTIALS
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Booking;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -33,14 +34,14 @@ class TrackingCard extends Component implements HasForms, HasTable
         return $table
             ->query(
                 Booking::where('user_id', Auth::id())
-                ->with([
-                    'reservation.signatories', 
-                    'approvers',
-                    'equipment' => function ($query) {
-                        $query->select('equipment.*')
-                            ->selectRaw('booking_equipment.quantity');
-                    }
-                ])
+                    ->with([
+                        'reservation.signatories',
+                        'approvers',
+                        'equipment' => function ($query) {
+                            $query->select('equipment.*')
+                                ->selectRaw('booking_equipment.quantity');
+                        },
+                    ])
             )
             ->columns([
                 TextColumn::make('purpose')
@@ -208,19 +209,19 @@ class TrackingCard extends Component implements HasForms, HasTable
             if (!$record->reservation || $record->status !== 'approved') {
                 return false;
             }
-    
+
             $allSignatoriesApproved = $record->reservation->signatories()
                 ->where('status', '!=', 'approved')
                 ->doesntExist();
-    
+
             // Only send notification if all conditions are met and notification hasn't been sent yet
-            if ($allSignatoriesApproved && 
-                $record->status === 'approved' && 
+            if ($allSignatoriesApproved &&
+                $record->status === 'approved' &&
                 !$record->pdfNotificationSent) {
-                
+
                 // Ensure relationships are loaded
                 $record->load(['equipment']);
-    
+
                 Notification::make()
                     ->title('Booking Form Ready')
                     ->body('Your booking has been fully approved. You can now download the booking form.')
@@ -233,11 +234,11 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->url(route('filament.user.pages.tracking-page', $record)),
                     ])
                     ->sendToDatabase($record->user);
-    
+
                 // Mark notification as sent
                 $record->update(['pdfNotificationSent' => true]);
             }
-    
+
             return $allSignatoriesApproved && $record->status === 'approved';
         } catch (\Exception $e) {
             Log::error('PDF Downloadable Check Error', [
@@ -263,7 +264,7 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ->schema([
                         TextEntry::make('reservation.admin_approval_date')
                             ->label('Pre-booking Approval')
-                            ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A') : null)
+                            ->formatStateUsing(fn($state) => $state ? Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A') : null)
                             ->icon(fn($state) => $state ? 'heroicon-o-check-circle' : 'heroicon-o-clock')
                             ->iconColor(fn($state) => $state ? 'success' : 'warning')
                             ->color(fn($state) => $state ? 'success' : 'warning')
@@ -328,16 +329,16 @@ class TrackingCard extends Component implements HasForms, HasTable
                     ])
                     ->columns(3),
 
-                    Fieldset::make('Date & Time')
+                Fieldset::make('Date & Time')
                     ->schema([
                         TextEntry::make('booking_start')
                             ->label('Start Date')
-                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
+                            ->formatStateUsing(fn($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
                             ->iconColor('primary')
                             ->icon('heroicon-o-calendar'),
                         TextEntry::make('booking_end')
                             ->label('End Date')
-                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
+                            ->formatStateUsing(fn($state) => Carbon::parse($state)->setTimezone('Asia/Manila')->format('M d, Y h:i A'))
                             ->iconColor('warning')
                             ->icon('heroicon-o-calendar'),
                     ]),
@@ -410,8 +411,11 @@ class TrackingCard extends Component implements HasForms, HasTable
 
     public function cancelBooking(Booking $booking)
     {
-        // Check if the booking can be cancelled (e.g., not already approved or in the past)
-        if ($booking->status === 'approved' || $booking->booking_date < now()) {
+        $user = Auth::user();
+
+        // Check if the booking can be cancelled
+        if (($booking->status === 'approved' || $booking->booking_date < now())
+            && $booking->status !== 'prebooking') {
             Notification::make()
                 ->title('Cannot cancel booking')
                 ->body('This booking cannot be cancelled.')
@@ -495,12 +499,12 @@ class TrackingCard extends Component implements HasForms, HasTable
         if (!$signatories instanceof \Illuminate\Support\Collection) {
             return 'No Signatories';
         }
-    
+
         $signatory = $signatories->firstWhere('role', $role);
         if (!$signatory) {
             return 'No Signatory';
         }
-        
+
         return match ($signatory->status) {
             'approved' => $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
             'denied' => $signatory->approval_date?->setTimezone('Asia/Manila')->format('M d, Y h:i A'),
