@@ -41,6 +41,7 @@ class BookingFormRequest extends FormRequest
             'equipment.*.quantity' => 'required|integer|min:1',
             'adviser_email' => 'required|email|max:255',
             'dean_email' => 'required|email|max:255',
+            'contact_number' => 'required|string|max:255',
         ];
     }
     public function messages()

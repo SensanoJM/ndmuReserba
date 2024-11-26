@@ -33,7 +33,8 @@ class BookingService
                     'duration' => $data['duration'],
                     'participants' => $data['participants'],
                     'user_id' => $userId,
-                    'status' => 'prebooking'
+                    'status' => 'prebooking',
+                    'contact_number' => $data['contact_number'],
                 ]);
 
                 // Batch insert equipment if present

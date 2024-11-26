@@ -306,6 +306,9 @@ class TrackingCard extends Component implements HasForms, HasTable
                             ->icon('heroicon-o-building-office-2'),
                         TextEntry::make('purpose')
                             ->icon('heroicon-o-pencil'),
+                        TextEntry::make('contact_number')
+                            ->icon('heroicon-o-phone')
+                            ->label('Contact Number'),
                         TextEntry::make('status')
                             ->badge()
                             ->color(fn(Booking $record): string => match ($record->status) {

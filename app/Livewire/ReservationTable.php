@@ -158,6 +158,12 @@ class ReservationTable extends Component implements HasForms, HasTable
                         TextEntry::make('user.name')
                             ->icon('heroicon-o-user')
                             ->label('User'),
+                        TextEntry::make('user.email')
+                            ->icon('heroicon-o-phone')
+                            ->label('Requester Email'),
+                        TextEntry::make('contact_number')
+                            ->icon('heroicon-o-phone')
+                            ->label('Requester Contact Number'),
                         TextEntry::make('facility.facility_name')
                             ->label('Facility')
                             ->icon('heroicon-o-building-office'),

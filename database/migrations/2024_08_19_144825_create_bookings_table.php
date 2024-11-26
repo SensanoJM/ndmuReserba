@@ -19,9 +19,10 @@ return new class extends Migration
             $table->enum('status', ['prebooking', 'in_review','pending', 'approved', 'denied'])->default('prebooking');
             $table->dateTime('booking_start');  // DateTime to store both date and time
             $table->dateTime('booking_end');    // DateTime to store both date and time
+            $table->string('contact_number');
+
             $table->timestamps();
             $table->softDeletes();
-
             $table->boolean('pdfNotificationSent')->default(false);
             $table->boolean('updateNotificationSent')->default(false);
             $table->index(['facility_id', 'booking_start', 'booking_end']);

@@ -144,6 +144,10 @@ class BookingCard extends Component implements HasTable, HasForms, HasInfolists
                         ->required()
                         ->integer()
                         ->minValue(1),
+                    TextInput::make('contact_number')
+                        ->label('Provide your Contact Number')
+                        ->required()
+                        ->tel(),
                 ]),
 
                 Section::make('Equipment')

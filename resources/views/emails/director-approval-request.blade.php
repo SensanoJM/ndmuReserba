@@ -52,6 +52,14 @@
                     <td>{{ $reservation->booking->user->name ?? 'N/A' }}</td>
                 </tr>
                 <tr>
+                    <th>Requester Email:</th>
+                    <td>{{ $reservation->booking->user->email ?? 'N/A' }}</td>
+                </tr>
+                <tr>
+                    <th>Requester Contact Number:</th>
+                    <td>{{ $reservation->booking->contact_number ?? 'N/A' }}</td>
+                </tr>
+                <tr>
                     <th>Facility:</th>
                     <td>{{ $reservation->booking->facility->facility_name ?? 'N/A' }}</td>
                 </tr>
@@ -79,7 +87,7 @@
                     <th style="text-align: left; padding-right: 10px;">Equipment:</th>
                     <td>
                         <ul style="list-style-type: disc; margin: 0; padding-left: 20px;">
-                            @foreach(explode(' • ', $formattedEquipment) as $equipment)
+                            @foreach(explode($formattedEquipment) as $equipment)
                                 <li style="margin-bottom: 5px;">{{ $equipment }}</li>
                             @endforeach
                         </ul>

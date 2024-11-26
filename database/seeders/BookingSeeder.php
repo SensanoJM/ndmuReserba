@@ -58,7 +58,19 @@ class BookingSeeder extends Seeder
             'user_id' => $users->random()->id,
             'facility_id' => $facility->id,
             'pdfNotificationSent' => false, // Default to false for new bookings
+            'contact_number' => $this->generateRandomPhoneNumber(),
         ]);
+    }
+
+    private function generateRandomPhoneNumber()
+    {
+        // Generates a random phone number in the format (XXX) XXX-XXXX
+        return sprintf(
+            "(%03d) %03d-%04d", 
+            rand(100, 999),  // Area code
+            rand(100, 999),  // First three digits
+            rand(0, 9999)    // Last four digits
+        );
     }
 
     private function createReservation($booking, $status)

@@ -130,6 +130,13 @@
             min-height: 18px;
         }
 
+        .field-valueee {
+            margin-left: 185px;
+            border-bottom: 1px dotted #000;
+            font-size: 10pt;
+            min-height: 18px;
+        }
+
         .description-field {
             font-size: 9pt;
         }
@@ -403,7 +410,7 @@
         <div class="field-value">{{ $booking->created_at->format('M d, Y') }}</div>
     </div>
     <div class="form-header clearfix">
-        <div class="participants">Number of Participants: {{ $booking->participants }}</div>
+        <div class="field-label">Number of Participants: {{ $booking->participants }}</div>
         <div class="instruction">(Booking application must be done 3 working days before the start of the activity)
         </div>
     </div>
@@ -412,6 +419,18 @@
     <div class="form-group">
         <div class="field-label">Organization/Department/Club/Unit:</div>
         <div class="field-valuee">{{ $booking->user->name ?? 'N/A' }}</div>
+    </div>
+
+    <!-- Email and Contact Number -->
+    <div class="date-time-group clearfix">
+        <div class="date-field">
+            <div class="field-label">Email:</div>
+            <div class="field-value">{{ $booking->user->email ?? 'N/A' }}</div>
+        </div>
+        <div class="time-field">
+            <div class="field-label">Contact Number:</div>
+            <div class="field-valueee">{{ $booking->contact_number }}</div>
+        </div>
     </div>
 
     <!-- Date and Time Fields -->
@@ -450,17 +469,20 @@
     <!-- Equipment Section HTML -->
     <div class="equipment-section">
         <div class="equipment-label">Facilities Requested:</div>
-            @if ($booking->equipment && $booking->equipment->count() > 0)
-                <div class="equipment-item">
-                    {{ $booking->equipment->map(function($equipment) {
-                        return ucwords(str_replace('_', ' ', $equipment->name)) . 
-                            ' (' . $equipment->pivot->quantity . ' ' . 
-                            ($equipment->pivot->quantity > 1 ? 'units' : 'unit') . ')';
+        @if ($booking->equipment && $booking->equipment->count() > 0)
+            <div class="equipment-item">
+                {{ $booking->equipment->map(function ($equipment) {
+                        return ucwords(str_replace('_', ' ', $equipment->name)) .
+                            ' (' .
+                            $equipment->pivot->quantity .
+                            ' ' .
+                            ($equipment->pivot->quantity > 1 ? 'units' : 'unit') .
+                            ')';
                     })->join(', ') }}
-                </div>
-            @else
-                <div class="no-equipment">No equipment requested</div>
-            @endif
+            </div>
+        @else
+            <div class="no-equipment">No equipment requested</div>
+        @endif
     </div>
 
     <!-- Section Divider -->

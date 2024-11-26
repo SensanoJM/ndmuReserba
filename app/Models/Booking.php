@@ -25,6 +25,7 @@ class Booking extends Model
         'status',
         'updateNotificationSent',
         'pdfNotificationSent',
+        'contact_number',
     ];
 
     protected $casts = [

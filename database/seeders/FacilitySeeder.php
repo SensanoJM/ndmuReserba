@@ -13,7 +13,7 @@ class FacilitySeeder extends Seeder
     {
         $facilities = [
             [
-                'facility_name' => 'Business Office Floor 1',
+                'facility_name' => 'Business Building Lobby Floor 1',
                 'facility_type' => 'Open Area',
                 'capacity' => 100,
                 'building_name' => 'Business Office Building',
@@ -24,7 +24,7 @@ class FacilitySeeder extends Seeder
                 'status' => true,
             ],
             [
-                'facility_name' => 'Business Office Floor 3',
+                'facility_name' => 'Business Building Lobby Floor 3',
                 'facility_type' => 'Open Area',
                 'capacity' => 100,
                 'building_name' => 'Business Office Building',
